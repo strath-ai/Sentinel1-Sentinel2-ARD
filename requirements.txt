@@ -1,0 +1,16 @@
+sentinelsat
+shapely
+earthpy
+descartes
+rasterio
+pyproj
+GDAL
+pandas
+geopandas
+numpy
+IPython
+matplotlib
+pyperclip
+docopt
+Rtree
+opencv-python
