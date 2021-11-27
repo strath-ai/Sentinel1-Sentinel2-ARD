@@ -1,0 +1,388 @@
+<graph id="Graph">
+  <version>1.0</version>
+
+  <node id="Read(2)">
+    <operator>Read</operator>
+    <sources/>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>${S2}</file>
+    </parameters>
+  </node>
+
+  <node id="Resample">
+    <operator>Resample</operator>
+    <sources>
+      <sourceProduct refid="Read(2)"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <referenceBand>B2</referenceBand>
+      <targetWidth/>
+      <targetHeight/>
+      <targetResolution/>
+      <upsampling>Bilinear</upsampling>
+      <downsampling>First</downsampling>
+      <flagDownsampling>First</flagDownsampling>
+      <resamplingPreset/>
+      <bandResamplings/>
+      <resampleOnPyramidLevels>true</resampleOnPyramidLevels>
+    </parameters>
+  </node>
+
+	
+  <node id="BandsExtractorOp2">
+    <operator>BandsExtractorOp</operator>
+    <sources>
+      <sourceProduct refid="BandMerge"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <sourceBandNames>${bands_S2}</sourceBandNames>
+      <sourceMaskNames></sourceMaskNames>
+    </parameters>
+  </node>
+
+  <node id="BandMaths">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>opaque_clouds_10m</name>
+          <type>float32</type>
+          <expression>opaque_clouds_10m</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+  <node id="BandMaths(2)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>cirrus_clouds_10m</name>
+          <type>float32</type>
+          <expression>cirrus_clouds_10m</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+  <node id="BandMaths(3)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>scl_dark_feature_shadow</name>
+          <type>float32</type>
+          <expression>scl_dark_feature_shadow</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+  <node id="BandMaths(4)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>scl_cloud_shadow</name>
+          <type>float32</type>
+          <expression>scl_cloud_shadow</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+  <node id="BandMaths(5)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>scl_vegetation</name>
+          <type>float32</type>
+          <expression>scl_vegetation</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+  <node id="BandMaths(6)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>scl_not_vegetated</name>
+          <type>float32</type>
+          <expression>scl_not_vegetated</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+  <node id="BandMaths(7)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>scl_cloud_medium_proba</name>
+          <type>float32</type>
+          <expression>scl_cloud_medium_proba</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+  <node id="BandMaths(8)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>scl_cloud_high_proba</name>
+          <type>float32</type>
+          <expression>scl_cloud_high_proba</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+  <node id="BandMaths(9)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>scl_thin_cirrus</name>
+          <type>float32</type>
+          <expression>scl_thin_cirrus</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+	
+  <node id="BandMaths(10)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>scl_water</name>
+          <type>float32</type>
+          <expression>scl_water</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+
+
+  <node id="BandMaths(11)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>scl_unclassified</name>
+          <type>float32</type>
+          <expression>scl_unclassified</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+  
+  <node id="BandMaths(12)">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>scl_snow_ice</name>
+          <type>float32</type>
+          <expression>scl_snow_ice</expression>
+          <description/>
+          <unit/>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+
+  <node id="BandMerge">
+    <operator>BandMerge</operator>
+    <sources>
+      <sourceProduct refid="Resample"/>
+      <sourceProduct.1 refid="BandMaths"/>
+      <sourceProduct.2 refid="BandMaths(2)"/>
+      <sourceProduct.3 refid="BandMaths(3)"/>
+      <sourceProduct.4 refid="BandMaths(4)"/>
+      <sourceProduct.5 refid="BandMaths(5)"/>
+      <sourceProduct.6 refid="BandMaths(6)"/>
+      <sourceProduct.7 refid="BandMaths(7)"/>
+      <sourceProduct.8 refid="BandMaths(8)"/>
+      <sourceProduct.9 refid="BandMaths(9)"/>
+      <sourceProduct.10 refid="BandMaths(10)"/>
+      <sourceProduct.11 refid="BandMaths(11)"/>
+      <sourceProduct.12 refid="BandMaths(12)"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <sourceBands/>
+      <geographicError>1.0E-5</geographicError>
+    </parameters>
+  </node>
+
+  <node id="Write2">
+    <operator>Write</operator>
+    <sources>
+      <sourceProduct refid="BandsExtractorOp2"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>${S2_write_path}</file>
+      <formatName>GeoTIFF-BigTIFF</formatName>
+    </parameters>
+  </node>
+
+  <applicationData id="Presentation">
+    <Description/>
+    <node id="Read">
+      <displayPosition x="161.0" y="72.0"/>
+    </node>
+    <node id="Calibration">
+      <displayPosition x="257.0" y="72.0"/>
+    </node>
+    <node id="Speckle-Filter">
+      <displayPosition x="393.0" y="73.0"/>
+    </node>
+    <node id="Terrain-Correction">
+      <displayPosition x="681.0" y="71.0"/>
+    </node>
+    <node id="Read(2)">
+      <displayPosition x="165.0" y="207.0"/>
+    </node>
+    <node id="Collocate">
+      <displayPosition x="708.0" y="208.0"/>
+    </node>
+    <node id="BandsExtractorOp1">
+      <displayPosition x="620.0" y="550.0"/>
+    </node>
+    <node id="Write1">
+      <displayPosition x="658.0" y="620.0"/>
+    </node>
+    <node id="BandsExtractorOp2">
+      <displayPosition x="739.0" y="550.0"/>
+    </node>
+    <node id="Write2">
+      <displayPosition x="756.0" y="620.0"/>
+    </node>
+    <node id="Resample">
+      <displayPosition x="418.0" y="206.0"/>
+    </node>
+    <node id="BandMerge">
+      <displayPosition x="525.0" y="206.0"/>
+    </node>
+    <node id="BandMaths">
+      <displayPosition x="417.0" y="250.0"/>
+    </node>
+    <node id="BandMaths(2)">
+      <displayPosition x="417.0" y="300.0"/>
+    </node>
+    <node id="BandMaths(3)">
+      <displayPosition x="417.0" y="350.0"/>
+    </node>
+    <node id="BandMaths(4)">
+      <displayPosition x="417.0" y="400.0"/>
+    </node>
+    <node id="BandMaths(5)">
+      <displayPosition x="417.0" y="450.0"/>
+    </node>
+    <node id="BandMaths(6)">
+      <displayPosition x="417.0" y="500.0"/>
+    </node>
+    <node id="BandMaths(7)">
+      <displayPosition x="417.0" y="550.0"/>
+    </node>
+    <node id="BandMaths(8)">
+      <displayPosition x="417.0" y="600.0"/>
+    </node>
+    <node id="BandMaths(9)">
+      <displayPosition x="417.0" y="650.0"/>
+    </node>
+    <node id="BandMaths(10)">
+      <displayPosition x="417.0" y="700.0"/>
+    </node>
+    <node id="BandMaths(11)">
+      <displayPosition x="417.0" y="750.0"/>
+    </node>
+    <node id="BandMaths(12)">
+      <displayPosition x="417.0" y="800.0"/>
+    </node>
+    <node id="Subset">
+      <displayPosition x="708.0" y="410.0"/>
+    </node>
+  </applicationData>
+</graph>
