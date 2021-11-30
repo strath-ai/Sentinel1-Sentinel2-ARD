@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+from argparse import ArgumentParser
+import os
+import subprocess
+import datetime
+
+
+def log(message):
+    datestr = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[LOG {datestr}] {message}")
+
+
+def main(output, download, no_flow, no_snap, version, args):
+    print(f"output {output}, download {download}, no_flow {no_flow}, no_snap {no_snap}, version {version}, args {args}")
+    command = None
+    if no_snap and no_flow:
+        command = "download_noflow"
+    elif no_snap:
+        command = "download"
+    elif download and no_flow:
+        command = "download_and_snap_noflow"
+    elif download:
+        command = "download_and_snap"
+    elif no_flow:
+        command = "snap_noflow"
+    else:
+        command = "snap"
+
+    dockerArgs = [
+        "docker",
+        "run",
+        "--gpus",
+        "all",
+        "-i",
+        "--rm",
+        "-e",
+        "GRANT_SUDO=yes",
+        "-e",
+        f"user_for_permissions={os.getuid()}:{os.getgid()}",
+        "-v",
+        f"{os.getcwd()}:/here",
+        "-v",
+        f"{output}:/var/satellite-data",
+        f"senprep:{version}",
+        command,
+        "run",
+        "--mount=/here",    
+        * args,
+    ]
+
+    log(f"IMAGE: senprep:{version}")
+    log(f"MNT: {os.getcwd()} -> <container>:/here")
+    log(f"MNT: {output} -> <container>:/var/satellite-data")
+    log(f"CMD: {command}")
+    if not os.path.exists(".metaflow"):
+        os.Mkdir(".metaflow")
+    log("-" * 40)
+
+    cmd = subprocess.run(dockerArgs)
+    log(f"EXEC: `{' '.join(dockerArgs)}`")
+    return cmd.returncode
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser(
+        "docker-snap",
+        description="Helper for launching the CIDCOM satellite preprocessing docker image",
+    )
+    parser.add_argument("--output", help="Where to save data", required=False)
+    parser.add_argument(
+        "--download", help="Download if necessary", action='store_true')
+    parser.add_argument(
+        "--no-flow", help="Don't run metaflow versions", action='store_true')
+    parser.add_argument("--no-snap", help="Don't run snap",
+                        action='store_true')
+    parser.add_argument(
+        "-v", "--version", default="latest", help="Which cidcom-research image to use"
+    )
+    args, unknown = parser.parse_known_args()
+
+    main(
+        output=args.output,
+        download=args.download,
+        no_flow=args.no_flow,
+        no_snap=args.no_snap,
+        version=args.version,
+        args=unknown,
+    )

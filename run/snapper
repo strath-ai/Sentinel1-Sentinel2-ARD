@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+USERNAME=metaflow python src/snap_flow.py $@

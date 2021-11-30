@@ -1,0 +1,53 @@
+# set base image (host OS)
+FROM ubuntu:18.04
+
+# Install useful prerequisites
+RUN apt-get update && apt-get upgrade -y &&\
+    apt-get install -y software-properties-common  &&\
+    # Install python and python package management
+    apt-get install -y curl python3.7 python3.7-dev python3.7-distutils &&\
+    apt-get clean &&\
+    # Make python3.7 the default
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.7 1 &&\
+    # Upgrade pip to latest version
+    curl -s https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python get-pip.py --force-reinstall && \
+    rm get-pip.py &&\
+    # Remove apt cache
+    rm -rf /var/lib/apt/lists/*
+
+# set the working directory in the container
+WORKDIR /code
+
+
+# Install SNAP / GPT
+RUN curl -s http://step.esa.int/downloads/7.0/installers/esa-snap_sentinel_unix_7_0.sh -o esa-snap.sh &&\ 
+	chmod +x esa-snap.sh &&\ 
+    ./esa-snap.sh -q &&\
+	rm esa-snap.sh &&\
+    snap --nosplash --nogui --modules --update-all 
+
+# Install GDAL and python
+RUN add-apt-repository ppa:ubuntugis/ppa &&\ 
+    apt-get update &&\
+    apt-get install -y gdal-bin libgdal-dev &&\
+    export CPLUS_INCLUDE_PATH=/usr/include/gdal &&\ 
+    export C_INCLUDE_PATH=/usr/include/gdal &&\
+	pip install numpy &&\
+    pip install gdal==$(gdalinfo --version | cut -d' ' -f2 | cut -d',' -f1)
+
+# Install other python dependencies
+COPY requirements.txt .
+RUN pip install -r requirements.txt 
+# Add 'gpt' directory to PATH
+ENV PATH="/usr/local/snap/bin:${PATH}"
+
+COPY src/ src/
+
+
+# command to run on container start
+# 'bash' entrypoint is for debugging
+# ENTRYPOINT ["bash"]
+# ...otherwise, run 'senprep', with whatever command the user gives
+ENTRYPOINT [ "python", "-m", "src.senprep" ] 
+CMD ["list"]

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+USERNAME=metaflow python src/download_flow_linear.py --no-pylint $@
+USERNAME=metaflow python src/snap_flow_linear.py --no-pylint $@
