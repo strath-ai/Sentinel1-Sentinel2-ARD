@@ -1,11 +1,12 @@
 # Naming Conventions
+
 The Sentinel tiles are downloaded at one common place in the folder /var/satellite-data/ to avoid redundant copies of the same tiles.
 
 The folders are made according to the following image.
 
 **TODO** update this image to match new conventions.
 
-<img src="./images/file_conventions.png" width="300" height="300" />
+![File naming convention diagram](./images/file_conventions.png)
 
 The patches are saved in the following folder /var/satellite-data/Sentinel_Patches which include the 
 
