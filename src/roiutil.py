@@ -10,6 +10,7 @@ from sentinelsat import read_geojson, geojson_to_wkt
 from shapely.geometry import Polygon, MultiPolygon, shape
 from shapely.ops import transform
 from shapely import wkt
+import numpy as np
 
 
 class ROI:
