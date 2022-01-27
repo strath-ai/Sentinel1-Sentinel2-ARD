@@ -14,11 +14,12 @@ import pandas as pd
 
 # IMPORTS - local
 try:
-    import roiutil
-    import senprep
-except:
     from src import roiutil
     from src import senprep
+except Exception as E:
+    import roiutil
+    import senprep
+
 
 SENTINEL_PRODUCT_FINDERS = set()
 

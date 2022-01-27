@@ -131,11 +131,11 @@ class CacheDB:
         -----------------
         """
         self.config = run_config
-        username = db_config['username']
-        password = db_config['password']
-        host = db_config.get('host', 'localhost')
-        port = db_config.get('port', 5432)
-        db_name = db_config['dbname']
+        username = db_config["username"]
+        password = db_config["password"]
+        host = db_config.get("host", "localhost")
+        port = db_config.get("port", 5432)
+        db_name = db_config["dbname"]
         self.con = sa.create_engine(
             f"postgresql://{username}:{password}@{host}:{port}/{db_name}", echo=echo
         )
@@ -245,8 +245,7 @@ class CacheDB:
         ).fetchall()[0][0]
 
     def get_config_response(self):
-        cols = [colname for (colname, coltype)
-                in SENTINELSAT_CONFIG_RESPONSE_SCHEMA]
+        cols = [colname for (colname, coltype) in SENTINELSAT_CONFIG_RESPONSE_SCHEMA]
         rows = self.con.execute(
             f"""
             SELECT config, product_set, uuid, roi_id FROM config_response
@@ -264,11 +263,10 @@ class CacheDB:
             SELECT * FROM config_results
             WHERE config_id = '{self.get_config_id()}' {where_clause}"""
         ).fetchall()
-        cols = [colname for (colname, coltype)
-                in SENTINELSAT_CONFIG_RESULTS_SCHEMA]
+        cols = [colname for (colname, coltype) in SENTINELSAT_CONFIG_RESULTS_SCHEMA]
         df = pd.DataFrame(rows, columns=cols)
         if translate_dir:
-            df['result_location'] = df.result_location.apply(
+            df["result_location"] = df.result_location.apply(
                 lambda x: Path(x.replace("<SENTINEL_ROOT>", translate_dir))
             )
         return df

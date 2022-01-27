@@ -45,7 +45,6 @@ from rasterio.mask import mask
 from sentinelsat import SentinelAPI, read_geojson, geojson_to_wkt, sentinel
 from shapely.geometry import Polygon, MultiPolygon, shape
 from shapely.ops import transform, cascaded_union
-from src import configutil, roiutil
 from subprocess32 import check_output
 import geopandas as gpd
 import getpass
@@ -68,11 +67,16 @@ import utm
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
+import requests
+from google.cloud import storage
 
+# TODO -- use the distinct plot library, rather than re-exporting functions
 try:
-    import configutil, roiutil, sen_plot
-except:
     from src import configutil, roiutil, sen_plot
+    from src.sen_plot import plot_ROI, plot_Stiles_plus_ROI, plot_S1S2tiles_plus_ROI
+except Exception as E:
+    import configutil, roiutil, sen_plot
+    from sen_plot import plot_ROI, plot_Stiles_plus_ROI, plot_S1S2tiles_plus_ROI
 
 
 SENTINEL_ROOT = "/var/satellite-data/"
@@ -106,8 +110,6 @@ SNOW = 11
 # cmap = colors.ListedColormap(['r','w','k','gray','g','y','b', 'pink','aquamarine', 'greenyellow', 'deepskyblue'])
 # pd.set_option('display.max_colwidth', None)
 
-# TODO -- use the distinct plot library, rather than re-exporting functions
-from sen_plot import plot_ROI, plot_Stiles_plus_ROI, plot_S1S2tiles_plus_ROI
 
 
 def multipolygon_to_polygon(mpoly):
@@ -136,6 +138,8 @@ def get_roi_cloud_cover(s2_product, ROI_footprint, print_plot = False):
     utm = productname[39:41]
     latb = productname[41:42]
     square = productname[42:44]
+    if not os.path.exists('./temp'):
+        os.mkdir('./temp')
     save_filename = Path('./temp/{}.gml'.format(productname))
     
     if not save_filename.exists():
@@ -199,6 +203,9 @@ def get_scl_cloud_mask(s2_product, ROI_footprint, print_plot = False):
     utm = productname[39:41]
     latb = productname[41:42]
     square = productname[42:44]
+    if not os.path.exists('./temp'):
+        os.mkdir('./temp')
+
     save_filename = Path('./temp/{}.jp2'.format(productname))
     
     if not save_filename.exists():
@@ -354,6 +361,9 @@ def find_S1(ROI_footprint, start_date, end_date, api, **kwargs):
         buffered_geometry_wgs84 = buffered_geometry.to_crs(epsg=4326)#.simplify(0.1)
         ###print("s1_products_df['geometry'][3]", s1_products_df['geometry'][3], buffered_geometry_wgs84 [3])
         s1_products_df['geometry'] = buffered_geometry_wgs84
+        if not os.path.exists('./temp'):
+            os.mkdir('./temp')
+
         s1_products_df.to_file('./temp/S1_products.geojson', driver="GeoJSON")
 
     return s1_products_df
@@ -456,6 +466,8 @@ def find_S2(ROI_footprint, start_date, end_date, api, **kwargs):
             
         else:
             print( (s2_products_df[['title', 'beginposition','cloudcoverpercentage']]).to_string(index=False))
+        if not os.path.exists('./temp'):
+            os.mkdir("./temp")
         s2_products_df.to_file('./temp/S2_products.geojson', driver="GeoJSON")
 
     return s2_products_df
@@ -784,7 +796,7 @@ def select_S1(s1_products_df, ROI, sorting_params=["overlap_area","beginposition
     ROI_table = []
     
     ## Resort the the sentinel products
-    s_products = sort_S1(s1_products_df, Remaining_ROI,sorting_params, sorting_params_ascending)   
+    s_products = sort_S1(s1_products_df, Remaining_ROI,sorting_params=sorting_params, sorting_params_ascending=sorting_params_ascending)   
     while Remaining_ROI.area >= 1e-10 and s_products.shape[0] > 0:
         #         time.sleep(3)
 
@@ -814,7 +826,7 @@ def select_S1(s1_products_df, ROI, sorting_params=["overlap_area","beginposition
 
         ## Resort the the sentinel products
         if Remaining_ROI.area >= 1e-10:
-            s_products = sort_S1(s_products, Remaining_ROI,sorting_params, sorting_params_ascending)
+            s_products = sort_S1(s_products, Remaining_ROI,sorting_params=sorting_params, sorting_params_ascending=sorting_params_ascending)
 
    
     s_final_df = pd.DataFrame(s_table, columns=column_label)
@@ -822,11 +834,14 @@ def select_S1(s1_products_df, ROI, sorting_params=["overlap_area","beginposition
     s_final_products["Percent_area_covered"] = list(s_final_df["overlap_area"]/ROI.area*100) 
     s_final_products["Area_covered"] = list(s_final_df["overlap_area"])
     n_prod = s_final_products.shape[0]
-    if kwargs.get('verbose', False):
-        logging.info(f"Selected Sentinel-1 Products: {n_prod}")
+    # if kwargs.get('verbose', False):
+    #     logging.info(f"Selected Sentinel-1 Products: {n_prod}")
 
-    print("Selected Sentinel-1 Products : ",n_prod)
-    print(s_final_products[["beginposition","Percent_area_covered"]])
+    # print("Selected Sentinel-1 Products : ",n_prod)
+    # print(s_final_products[["beginposition","Percent_area_covered"]])
+    if not os.path.exists('./temp'):
+        os.mkdir('./temp')
+
     s_final_products.to_file('./temp/S1_products_selected.geojson', driver="GeoJSON")
     return s_final_products, ROI_table
 
@@ -872,7 +887,7 @@ def select_S2(s2_products_df, ROI,sorting_params=["overlap_area","cloudcoverperc
     if 'ROI_cloud_free_area' in sorting_params:
         cloud_free_area_table = []     
     ## Resort the list
-    s_products =sort_S2(s2_products_df, Remaining_ROI, sorting_params, sorting_params_ascending)
+    s_products =sort_S2(s2_products_df, Remaining_ROI, sorting_params=sorting_params, sorting_params_ascending=sorting_params_ascending)
     while Remaining_ROI.area >= 1e-10 and s_products.shape[0] > 0:
         #         time.sleep(3)
         iteration = iteration + 1
@@ -905,7 +920,7 @@ def select_S2(s2_products_df, ROI,sorting_params=["overlap_area","cloudcoverperc
         
         ## Resort the list
         if Remaining_ROI.area >= 1e-10:
-             s_products =sort_S2(s_products, Remaining_ROI,sorting_params, sorting_params_ascending)
+             s_products =sort_S2(s_products, Remaining_ROI, sorting_params=sorting_params, sorting_params_ascending=sorting_params_ascending)
     s_final_df = pd.DataFrame(s_table, columns=column_label)
 
     s_final_products = s2_products_df.reindex(s_final_df["Product_id"])
@@ -915,14 +930,17 @@ def select_S2(s2_products_df, ROI,sorting_params=["overlap_area","cloudcoverperc
              s_final_products['ROI_cloud_free_area'] =  cloud_free_area_table
     n_prod = s_final_products.shape[0]
         
-    if kwargs.get('verbose', False):
-        logging.info(f"Selected Sentinel-2 Products: {n_prod}")
+    # if kwargs.get('verbose', False):
+    #     logging.info(f"Selected Sentinel-2 Products: {n_prod}")
+    if not os.path.exists('./temp'):
+        os.mkdir("./temp")
+
     s_final_products.to_file('./temp/S2_products_selected.geojson', driver="GeoJSON")
-    print("Selected Sentinel-2 Products : ",n_prod)
-    if 'ROI_cloud_free_area' in sorting_params:
-        print(s_final_products[["title","beginposition","ROI_cloud_free_area","cloudcoverpercentage", "Area_covered", "Percent_area_covered"]].to_string(index=False))
-    else:
-        print(s_final_products[["title","beginposition","cloudcoverpercentage","overlap_area", "Percent_area_covered"]].to_string(index=False))
+    # print("Selected Sentinel-2 Products : ",n_prod)
+    # if 'ROI_cloud_free_area' in sorting_params:
+    #     print(s_final_products[["title","beginposition","ROI_cloud_free_area","cloudcoverpercentage", "Area_covered", "Percent_area_covered"]].to_string(index=False))
+    # else:
+    #     print(s_final_products[["title","beginposition","cloudcoverpercentage","overlap_area", "Percent_area_covered"]].to_string(index=False))
     return s_final_products, ROI_table
 
 
@@ -982,8 +1000,53 @@ def mark_product_as_used(*, s1_uuid, s1_date, s2_uuid, s2_date, collocated_folde
     filename = Path(SENTINEL_ROOT) / "used-products.csv"
     existing_products.to_csv(filename, index=False)
 
+def download_from_googlecloud(client, bucket, blob_prefix, productname, rootdir=SENTINEL_ROOT):
+    """ Replacement for gsutil to recursively download from a bucket using the Google Storage Python API"""
+    out_folder = Path(rootdir) / productname
+    out_folder.mkdir(exist_ok=True)
+    blobs = client.list_blobs(bucket, prefix=blob_prefix, delimiter='/')
+    for blob in blobs:
+        if blob.name.endswith("_$folder$"):
+            prefix_new = blob.name[:-len("_$folder$")] + "/"
+            productname_new = productname + "/" + blob.name[:-9].split("/")[-1]
+            download_from_googlecloud(client, bucket, prefix_new, productname_new, rootdir)
+        else:
+            filename = blob.name.split("/")[-1]
+            filepath = Path(rootdir) / productname / filename 
+            return blob.download_to_filename(filepath)
 
-def download_S2_GCS(s2_product):
+
+def download_S2_GCS_py(s2_product, credentials, **kwargs):
+    """If Sentinel-2 L2A Data has arleady been archived on the sentinel hub, this function
+    downloads the data from the Google Cloud Server. SAFE files will be saved in /var/satellite-data/         Uses the Python API
+    Requires Google Cloud Storage credentials
+    export GOOGLE_APPLICATION_CREDENTIALS="credentials_gs.json"
+
+
+    Argument in:
+    s2_products_df from previous sentinel query"""
+
+    outdir = kwargs.get('outdir', SENTINEL_ROOT)
+
+    date = s2_product.beginposition.to_pydatetime()
+    year = str(date.year)
+    month = str(date.month)
+    day = str(date.day)
+    productname = s2_product.title
+    utm = productname[39:41]
+    latb = productname[41:42]
+    square = productname[42:44]
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(credentials)
+
+#    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "demo4_preprocessing/credentials_gs.json"
+
+    client = storage.Client()
+    bucket = client.bucket("gcp-public-data-sentinel-2")
+    blob_prefix = "L2/tiles/{}/{}/{}/{}.SAFE/".format(utm, latb, square, productname)
+    return download_from_googlecloud(client, bucket, blob_prefix, productname, outdir)
+
+
+def download_S2_GCS(s2_product, credentials=None, **kwargs):
     """If Sentinel-2 L2A Data has arleady been archived on the sentinel hub, this function
     downloads the data from the Google Cloud Server. SAFE files will be saved in /var/satellite-data/
 
@@ -999,7 +1062,23 @@ def download_S2_GCS(s2_product):
     latb = productname[41:42]
     square = productname[42:44]
 
-    # tiles/[UTM code]/latitude band/square/productname.SAFE
+    if credentials is not None:
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(credentials)
+
+    # client = storage.Client()
+    # bucket = client.bucket("gcp-public-data-sentinel-2")
+    # blob_prefix = f"L2/tiles/{utm}/{latb}/{square}/{productname}.SAFE/"
+
+    # download_from_googlecloud(client, bucket, blob_prefix, productname, SENTINEL_ROOT)
+
+    # # tiles/[UTM code]/latitude band/square/productname.SAFE
+    outdir = kwargs.get('outdir', SENTINEL_ROOT)
+
+    filepath = Path(outdir) / (productname + ".SAFE")
+    if filepath.exists():
+        print("S2 already downloaded")
+        return 0
+    
     proc_output = subprocess.run(
         [
             "gsutil",
@@ -1009,15 +1088,16 @@ def download_S2_GCS(s2_product):
             "gs://gcp-public-data-sentinel-2/L2/tiles/{}/{}/{}/{}.SAFE".format(
                 utm, latb, square, productname
             ),
-            "{}".format(SENTINEL_ROOT),
+            str(outdir),
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         # stderr=subprocess.DEVNULL # hide gpt's info and warning messages
     )
+    return proc_output.returncode
 
 
-def download_S2_AWS(s2_product):
+def download_S2_AWS(s2_product, **kwargs):
     """If Sentinel-2 L2A Data has arleady been archived on the sentinel hub, this function
     downloads the data from the AWS. SAFE files will be saved in /var/satellite-data/
 
@@ -1033,10 +1113,11 @@ def download_S2_AWS(s2_product):
     utm = productname[39:41]
     latb = productname[41:42]
     square = productname[42:44]
+    outdir = kwargs.get('outdir', SENTINEL_ROOT)
 
     # tiles/[UTM code]/latitude band/square/[year]/[month]/[day]/[sequence]/DATA
     url = "s3://sentinel-s2-l2a/tiles/{}/{}/{}/{}/{}/{}/".format(utm, latb, square, year, month, day)
-    filename = SENTINEL_ROOT + productname + ".SAFE"
+    filename = str(Path(outdir) / (productname + ".SAFE"))
     process = subprocess.run(
         [
             "aws",
@@ -1051,7 +1132,7 @@ def download_S2_AWS(s2_product):
     )
 
 
-def download_S2_sentinelhub(s2_product):
+def download_S2_sentinelhub(s2_product, **kwargs):
     """If Sentinel-2 L2A Data has arleady been archived on the sentinel hub, this function
     downloads the data from the AWS. SAFE files will be saved in /var/satellite-data/
 
@@ -1059,6 +1140,7 @@ def download_S2_sentinelhub(s2_product):
     s2_products_df from previous sentinel query
     """
 
+    outdir = kwargs.get('outdir', SENTINEL_ROOT)
     # tiles/[UTM code]/latitude band/square/[year]/[month]/[day]/[sequence]/DATA
     proc_output = subprocess.run(
         [
@@ -1066,7 +1148,7 @@ def download_S2_sentinelhub(s2_product):
             "--product",
             str(s2_product.title),
             "-f",
-            str(SENTINEL_ROOT),
+            str(outdir),
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -1074,7 +1156,7 @@ def download_S2_sentinelhub(s2_product):
     )
 
 
-def download_S1_AWS(s1_product):
+def download_S1_AWS(s1_product, **kwargs):
     """If Sentinel-1 GRD Data has arleady been archived on the sentinel hub, this function
     downloads the data from the AWS. SAFE files will be saved in /var/satellite-data/
 
@@ -1088,9 +1170,10 @@ def download_S1_AWS(s1_product):
     day = str(date.day)
     productname = s1_product.title
 
+    outdir = kwargs.get('outdir', SENTINEL_ROOT)
     # [product type]/[year]/[month]/[day]/[mode]/[polarization]/[product identifier]
     url = "s3://sentinel-s1-l1c/GRD/{}/{}/{}/IW/DV/{}/".format(year, month, day, productname)
-    filename = SENTINEL_ROOT + productname + ".SAFE"
+    filename = outdir + productname + ".SAFE"
     process = subprocess.run(
         [
             "aws", "s3", "cp",
@@ -1105,7 +1188,48 @@ def download_S1_AWS(s1_product):
     )
 
 
-def download_S1_NOAA(s1_product, auth=None):
+def download_S1_NOAA_py(s1_product, auth=None, **kwargs):
+    if auth:
+        username = auth["username"]
+        password = auth["password"]
+        outdir = SENTINEL_ROOT
+    else:
+        username = input("Earthdata Login Username: ")
+        password = getpass.getpass(prompt="Password: ")
+        # outputpath = input(
+        #     "Where would you like to save the downlaoded data? (e.g /media/raid/satellite-data/ ) "
+        # )
+    productname = s1_product.title
+    producttype = productname[7:10]
+    satellite = productname[2]
+    outdir = kwargs.get('outdir', SENTINEL_ROOT)
+
+    if producttype == "SLC":
+        url = "https://datapool.asf.alaska.edu/{}/S{}/{}.zip"
+    else:
+        url = "https://datapool.asf.alaska.edu/{}_HD/S{}/{}.zip"
+    url = url.format(producttype, satellite, productname)
+   
+    err = 0
+    p_out = Path(outdir) / (productname + ".zip")
+    if p_out.exists():
+        print("S1 already downloaded")
+        return
+    with requests.Session() as s:
+        s.auth = (username, password)
+        r1 = s.request('get', url)
+        r = s.get(r1.url, auth=(username, password))
+        if r.ok:
+            with p_out.open('wb') as f:
+                f.write(r.content)
+            f.close()
+        else:
+            err = -1
+        s.close()
+    return err 
+
+
+def download_S1_NOAA(s1_product, auth=None, **kwargs):
     """If Sentinel-1 GRD Data has arleady been archived on the sentinel hub, this function
     downloads the data from ASF NASA API. ZIP files will be saved
 
@@ -1116,7 +1240,7 @@ def download_S1_NOAA(s1_product, auth=None):
     if auth:
         username = auth["username"]
         password = auth["password"]
-        outputpath = SENTINEL_ROOT
+        # outputpath = SENTINEL_ROOT
     elif Path("credentials_noaa.json").exists():
         credentials_noaa = json.load(open("credentials_noaa.json"))
         username = credentials_noaa["username"]
@@ -1124,19 +1248,21 @@ def download_S1_NOAA(s1_product, auth=None):
     else:
         username = input("Earthdata Login Username: ")
         password = getpass.getpass(prompt="Password: ")
-        outputpath = input(
-            "Where would you like to save the downlaoded data? (e.g /media/raid/satellite-data/ ) "
-        )
+        # outputpath = input(
+        #     "Where would you like to save the downlaoded data? (e.g /media/raid/satellite-data/ ) "
+        # )
 
     productname = s1_product.title
     producttype = productname[7:10]
     satellite = productname[2]
+    outdir = kwargs.get('outdir', SENTINEL_ROOT)
 
     if producttype == "SLC":
         url = "https://datapool.asf.alaska.edu/{}/S{}/{}.zip"
     else:
         url = "https://datapool.asf.alaska.edu/{}_HD/S{}/{}.zip"
     url = url.format(producttype, satellite, productname)
+    print(url)
 
     args = [
         "wget",
@@ -1145,9 +1271,10 @@ def download_S1_NOAA(s1_product, auth=None):
         "--http-password='{}'".format(password),
         url,
         "-P",
-        outputpath,
-        "--quiet",
+        outdir,
+        # "--quiet",
     ]
+    print(args)
     process = subprocess.run(
         args,
         stdout=subprocess.PIPE,
@@ -1281,13 +1408,13 @@ class SentinelPreprocessor:
     
     def sort_primary(self, primary_products, footprint):
         if self.primary =='S2': 
-            primary_products_sorted =sort_S2(primary_products, footprint, self.primary_S2_params, self.primary_S2_params_ascending)
+            primary_products_sorted =sort_S2(primary_products, footprint, sorting_params=self.primary_S2_params, sorting_params_ascending=self.primary_S2_params_ascending)
             if self.cloud_mask_filtering:
                 print(primary_products_sorted[["title","SCL_area","cloudcoverpercentage", "overlap_area"]].to_string(index=False))
             else:
                 print(primary_products_sorted[["title","cloudcoverpercentage", "overlap_area"]].to_string(index=False))
         elif self.primary =='S1': 
-            primary_products_sorted =sort_S1(primary_products, footprint, self.primary_S1_params, self.primary_S1_params_ascending)
+            primary_products_sorted =sort_S1(primary_products, footprint,sorting_params= self.primary_S1_params, sorting_params_ascending=self.primary_S1_params_ascending)
         
         
         return primary_products_sorted
@@ -1322,9 +1449,9 @@ class SentinelPreprocessor:
         ## Find out the time difference in hours between primary and secondary
         secondary_products["abs_time_delta_from_primary_hrs"]=  abs((secondary_products["beginposition"] -       primary_product["beginposition"]).dt.total_seconds()/3600)
         if self.primary =='S2': 
-            secondary_products_sorted =sort_S1(secondary_products, footprint, self.secondary_S1_params, self.secondary_S1_params_ascending)
+            secondary_products_sorted =sort_S1(secondary_products, footprint,sorting_params= self.secondary_S1_params, sorting_params_ascending=self.secondary_S1_params_ascending)
         elif self.primary =='S1': 
-            secondary_products_sorted =sort_S2(secondary_products, footprint, self.secondary_S2_params, self.secondary_S2_params_ascending)
+            secondary_products_sorted =sort_S2(secondary_products, footprint, sorting_params=self.secondary_S2_params, sorting_params_ascending=self.secondary_S2_params_ascending)
         return secondary_products_sorted
     
     def select_secondary(self, secondary_products_sorted, primary_product, footprint, print_fig=False):
