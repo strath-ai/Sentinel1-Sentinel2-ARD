@@ -25,7 +25,7 @@ import roiutil
 SENTINEL_ROOT = "/var/satellite-data/"
 
 
-def find_products(config, credentials, njobs=1):
+def find_products(config, credentials):
     """Find products using a callback from `product_finder.SentinelProductFinder`."""
     finder = getattr(product_finder, config["callback_find_products"])
     product_list, other_find_results = finder(config, credentials)
@@ -167,7 +167,6 @@ if __name__ == "__main__":
     parser.add_argument("--config", required=True)
     parser.add_argument("--credentials", required=True)
     parser.add_argument("--mount", required=False)
-    parser.add_argument("--njobs", default=1, required=False)
     parser.add_argument("--rebuild", required=False, default=False)
     parser.add_argument("--output", help="Change output directory", required=False)
     args = parser.parse_args()
