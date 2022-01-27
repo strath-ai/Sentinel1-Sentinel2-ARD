@@ -187,12 +187,9 @@ class SnapProcess(FlowSpec):
         for s1_or_s2, fn_collocate in self.to_clip:
             # fn_collocate: <SENTINEL_ROOT>/<name>/ROI/S1/Collocated/S1_abc_S2_def.tif
             # stem => S1_abc_S2_def ==> s1_uuid = abc, s2_uuid = def
-            _, s1uuid, _, s2uuid = fn_collocate.stem.split(
-                "_"
-            )
-            cropdir = (
-                fn_collocate.parent.parent / "Clipped"
-            )  # go back to the /S1/ folder, as per above example
+            _, s1uuid, _, s2uuid = fn_collocate.stem.split("_")
+            # go back to the /S1/ folder, as per above example
+            cropdir =  fn_collocate.parent.parent / "Clipped"  
             roi_dir = fn_collocate.parent.parent.parent  # e.g. the ../ROI1/ part
             roi_no = roi_dir.name.replace("ROI", "")  # e.g. the '1' from ROI1
             roi_path = roi_dir / f"ROI{roi_no}.geojson"

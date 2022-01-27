@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import math
+import itertools
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -35,8 +36,7 @@ def crop_image(s1_or_s2, filename):
     # filename: <SENTINEL_ROOT>/<name>/ROI/S1/Collocated/S1_abc_S2_def.tif
     if not isinstance(filename, Path):
         filename = Path(filename)
-    _, s1uuid, _, s2uuid = filename.stem.split(
-        "_")  # e.g. s1_uuid = abc, s2_uuid = def
+    _, s1uuid, _, s2uuid = filename.stem.split("_")  # e.g. s1_uuid = abc, s2_uuid = def
     cropdir = (
         filename.parent.parent / "Clipped"
     )  # go back to the /S1/ folder, as per above example
@@ -62,7 +62,6 @@ def crop_image(s1_or_s2, filename):
         cropToCutline=True,
         dstNodata=999999999.0,
     )
-    gdal_result = None
     return (s1_or_s2, path_crop, filename)
 
 
@@ -74,7 +73,8 @@ def crop(to_crop):
 
 
 def make_patches_from_image(s1_or_s2, filename_cropped, filename_collocated, config):
-    # filename_cropped is like <SENTINEL_ROOT>/<name>/ROI<roi_no>/<S1_or_S2>/Clipped/<S1_or_S2>_roi<num>_uuid.tif
+    # filename_cropped is like 
+    # <SENTINEL_ROOT>/<name>/ROI<roi_no>/<S1_or_S2>/Clipped/<S1_or_S2>_roi<num>_uuid.tif
     patchdir = filename_cropped.parent / "PATCHES"
     patchdir.mkdir(exist_ok=True)
 
@@ -88,32 +88,18 @@ def make_patches_from_image(s1_or_s2, filename_cropped, filename_collocated, con
 
     height, width = config["size"]
     row_starts = np.arange(0, raster_im.shape[1], height)
-    row_ends = row_starts + height - 1
     col_starts = np.arange(0, raster_im.shape[2], width)
-    col_ends = col_starts + width - 1
 
-    n_patches = 0
-    for row_start, row_end in zip(row_starts, row_ends):
-        for col_start, col_end in zip(col_starts, col_ends):
-            patch_filename = (
-                f"S1_{s1uuid}_S2_{s2uuid}_{row_start}_{col_start}_{width}x{height}.tif"
-            )
-            path_patch = str(patchdir / patch_filename)
-
-            start_x, start_y = raster.xy(row_start, col_start)
-            start_x = start_x - res / 2
-            start_y = start_y + res / 2
-
-            end_x, end_y = raster.xy(row_end, col_end)
-            end_x = start_x + res / 2
-            end_y = start_y - res / 2
-
-            projWin = [start_x, start_y, end_x, end_y]
-            gdal.Translate(path_patch, gdal_dataset,
-                           format="GTiff", projWin=projWin)
-            n_patches += 1
+    # basically, ...for r in rows: for c in cols... , but done upfront, outside the loop
+    top_left_corners = itertools.product(col_starts, row_starts) 
+    for (col, row) in top_left_corners:
+        patch_filename = f"S1_{s1uuid}_S2_{s2uuid}_{row}_{col}_{width}x{height}.tif"
+        path_patch = str(patchdir / patch_filename)
+        self.patches.append(path_patch)
+        gdal.Translate(path_patch, gdal_dataset, format="GTiff", srcWin=[col, row, width, height])
     raster.close()
-    # TODO finish
+    self.n_patches = len(self.patches)
+
     return n_patches
 
 
@@ -121,8 +107,7 @@ def make_patches(to_patch):
     n_patches = 0
     height, width = config["size"]
     for s1_or_s2, fn_cropped, fn_collocate in to_patch:
-        n_patches += make_patches_from_image(s1_or_s2,
-                                             fn_cropped, fn_collocate)
+        n_patches += make_patches_from_image(s1_or_s2, fn_cropped, fn_collocate)
     return n_patches
 
 
@@ -161,16 +146,14 @@ def snap_flow_mapper(product_set, snap_function, config, mount=None, rebuild=Fal
     # run_snap O(1)
     # crop O(n) -- snap will return N outputs, so crop will have to run N times
     # patch O(n^2) -- patch generation loop for each of N crop outputs
-    filenames_collocated = snap_function(
-        product_set, config, args.mount, args.rebuild)
+    filenames_collocated = snap_function(product_set, config, args.mount, args.rebuild)
 
     # filenames_collocated is something like:
     # [("S1", filename_s1_collocated), ("S2", filename_s2_collocated)]
 
     n_patches = 0
     for sat_type, filename in filenames_collocated:
-        s1_or_s2, filename_cropped, filename_collocated = crop_image(
-            sat_type, filename)
+        s1_or_s2, filename_cropped, filename_collocated = crop_image(sat_type, filename)
         n_patches += make_patches_from_image(
             s1_or_s2, filename_cropped, filename_collocated, config
         )
@@ -184,8 +167,7 @@ if __name__ == "__main__":
     parser.add_argument("--mount", required=False)
     parser.add_argument("--njobs", default=1, required=False)
     parser.add_argument("--rebuild", required=False, default=False)
-    parser.add_argument(
-        "--output", help="Change output directory", required=False)
+    parser.add_argument("--output", help="Change output directory", required=False)
     args = parser.parse_args()
 
     config = args.config
@@ -210,10 +192,6 @@ if __name__ == "__main__":
     assert "callback_find_products" in config, "Need a callback to find product IDs"
     assert "callback_snap" in config, "Need a callback for running SNAP"
     assert "geojson" in config, "Need a geojson region of interest"
-
-    print("GDAL CACHE MAX", gdal.GetCacheMax())
-    break
-
     print("FINDER:", config.callback_find_products)
     print("SNAPPER:", config.callback_snap)
 
@@ -229,5 +207,4 @@ if __name__ == "__main__":
     for p_set in product_sets:
         results.append(snap_flow_mapper(p_set, snap_func, config))
     print()
-    print(sum(results), "patches created from",
-          len(product_sets), "sets of products")
+    print(sum(results), "patches created from", len(product_sets), "sets of products")
