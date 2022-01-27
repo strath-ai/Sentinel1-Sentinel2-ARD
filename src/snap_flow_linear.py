@@ -92,23 +92,23 @@ def make_patches_from_image(s1_or_s2, filename_cropped, filename_collocated, con
 
     # basically, ...for r in rows: for c in cols... , but done upfront, outside the loop
     top_left_corners = itertools.product(col_starts, row_starts) 
+    patches = []
     for (col, row) in top_left_corners:
         patch_filename = f"S1_{s1uuid}_S2_{s2uuid}_{row}_{col}_{width}x{height}.tif"
         path_patch = str(patchdir / patch_filename)
-        self.patches.append(path_patch)
+        patches.append(path_patch)
         gdal.Translate(path_patch, gdal_dataset, format="GTiff", srcWin=[col, row, width, height])
     raster.close()
-    self.n_patches = len(self.patches)
-
-    return n_patches
+    return patches
 
 
 def make_patches(to_patch):
-    n_patches = 0
     height, width = config["size"]
+    all_patches = []
     for s1_or_s2, fn_cropped, fn_collocate in to_patch:
-        n_patches += make_patches_from_image(s1_or_s2, fn_cropped, fn_collocate)
-    return n_patches
+        patches = make_patches_from_image(s1_or_s2, fn_cropped, fn_collocate)
+        all_patches.extend(patches)
+    return all_patches
 
 
 def snap_flow_mapper(product_set, snap_function, config, mount=None, rebuild=False):
@@ -152,12 +152,14 @@ def snap_flow_mapper(product_set, snap_function, config, mount=None, rebuild=Fal
     # [("S1", filename_s1_collocated), ("S2", filename_s2_collocated)]
 
     n_patches = 0
+    all_patches = []
     for sat_type, filename in filenames_collocated:
         s1_or_s2, filename_cropped, filename_collocated = crop_image(sat_type, filename)
-        n_patches += make_patches_from_image(
+        patches = make_patches_from_image(
             s1_or_s2, filename_cropped, filename_collocated, config
         )
-    return n_patches
+        all_patches.extend(patches)
+    return len(all_patches)
 
 
 if __name__ == "__main__":

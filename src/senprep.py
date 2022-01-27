@@ -624,7 +624,8 @@ def sort_S1(s_products_df, ROI, **kwargs):
     """
     sorting_params = kwargs.get("sorting_params", ["overlap_area", "beginposition"])
     sorting_params_ascending = kwargs.get("sorting_params_ascending", [False, True])
-    s_products_df["overlap_area"]= (s_products_df.geometry.intersection(ROI)).area ### in km2
+    with pd.option_context('mode.chained_assignment', None):
+        s_products_df["overlap_area"] = s_products_df["geometry"].intersection(ROI).area  # in km2
     s_products_df_sorted = s_products_df.sort_values(by=sorting_params, ascending=sorting_params_ascending)
     s_products_df_sorted = s_products_df_sorted[s_products_df_sorted["overlap_area"] > 0.0]
     return s_products_df_sorted
@@ -662,7 +663,8 @@ def sort_S2(s_products_df, ROI, **kwargs):
     sorting_params_ascending = kwargs.get(
         "sorting_params_ascending", [False, True, True]
     )
-    s_products_df["overlap_area"]= (s_products_df.geometry.intersection(ROI)).area  ### in km2
+    with pd.option_context('mode.chained_assignment', None):
+        s_products_df["overlap_area"] = s_products_df.geometry.intersection(ROI).area   # in km2
     if 'ROI_cloud_free_area' in sorting_params:
         cloud_roi_table = []     
         for i in range(0, s_products_df.shape[0]):            
