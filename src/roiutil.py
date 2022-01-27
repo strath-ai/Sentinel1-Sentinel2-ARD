@@ -9,39 +9,37 @@ from descartes.patch import PolygonPatch
 from sentinelsat import read_geojson, geojson_to_wkt
 from shapely.geometry import Polygon, MultiPolygon, shape
 from shapely.ops import transform
-from shapely import wkt
 import numpy as np
 
 
 class ROI:
     def __init__(self, geojson):
         """Create a ROI object.
-
+        
         Will load footprint, shapely geometry, and features into a class.
-
+        
         Arguments
         ---------
         geojson : str
             String of geojson data
-
+        
         Returns
         -------
         ROI instance
         """
         self.footprint = None
-        with tempfile.NamedTemporaryFile("w") as f:
+        with tempfile.NamedTemporaryFile('w') as f:
             f.write(geojson)
             f.seek(0)
             self.footprint = geojson_to_wkt(read_geojson(f.name))
         # self.cloud_cover = config['cloud_cover']
         # This may be a bit brittle to keep the geojson within the config file
-        self.features = json.loads(geojson)["features"][0]
-        self.shape = shape(self.features["geometry"])
-
+        self.features = json.loads(geojson)['features'][0]
+        self.shape = shape(self.features['geometry'])
 
     def plot(self, grid=False):
         """Plots region of Interest
-
+        
         Arguments
         ---------
         grid : bool
@@ -62,15 +60,16 @@ class ROI:
         ax.axis("equal")
         return ax
 
+
     @staticmethod
     def load_from_file(filename):
         """Loads ROI in a shapely geometry
-
+        
         Arguments
         ---------
         filename : str or os.PathLike
             Path to the geojson file
-
+            
         Returns
         -------
         shapely geometry
@@ -80,8 +79,6 @@ class ROI:
 
         return ROI(features)
 
-    def to_multipolygon(self):
-        return MultiPolygon([wkt.loads(self.shape.to_wkt())])
 
 
 def export_to_file(roi, filename, crs):
@@ -90,7 +87,7 @@ def export_to_file(roi, filename, crs):
     project = partial(pyproj.transform, wgs84, utm)
     utm_ROI = transform(project, roi)
 
-    if not hasattr(utm_ROI, "exterior"):
+    if not hasattr(utm_ROI, 'exterior'):
         print("utm_ROI doesn't have an 'exterior'")
         print(f"Type of utm_ROI: {str(type(utm_ROI))}")
     try:
@@ -107,7 +104,7 @@ def export_to_file(roi, filename, crs):
             utm_ROI = utm_ROI.buffer(0)
         utm_ROI_m = utm_ROI
     ROI_gpd = gpd.GeoDataFrame(utm_ROI_m, crs=str(crs))
-    ROI_gpd = ROI_gpd.rename(columns={0: "geometry"})
+    ROI_gpd = ROI_gpd.rename(columns={0: 'geometry'})
     # explicitly set it as geometry for the GeoDataFrame
-    ROI_gpd.set_geometry(col="geometry", inplace=True)
-    ROI_gpd.to_file(filename, driver="GeoJSON")
+    ROI_gpd.set_geometry(col='geometry', inplace=True) 
+    ROI_gpd.to_file(filename, driver='GeoJSON')
