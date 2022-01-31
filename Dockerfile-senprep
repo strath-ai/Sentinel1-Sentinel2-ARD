@@ -3,7 +3,7 @@ FROM ubuntu:18.04
 
 # Install useful prerequisites
 RUN apt-get update && apt-get upgrade -y &&\
-    apt-get install -y software-properties-common  &&\
+    apt-get install -y software-properties-common fonts-dejavu fontconfig &&\
     # Install python and python package management
     apt-get install -y curl python3.7 python3.7-dev python3.7-distutils &&\
     apt-get clean &&\
@@ -19,22 +19,24 @@ RUN apt-get update && apt-get upgrade -y &&\
 # set the working directory in the container
 WORKDIR /code
 
-
 # Install SNAP / GPT
-RUN curl -s http://step.esa.int/downloads/7.0/installers/esa-snap_sentinel_unix_7_0.sh -o esa-snap.sh &&\ 
-	chmod +x esa-snap.sh &&\ 
+COPY install-snap.sh .
+RUN curl -s https://download.esa.int/step/snap/8.0/installers/esa-snap_sentinel_unix_8_0.sh -o esa-snap.sh &&\
+    chmod +x esa-snap.sh &&\
     ./esa-snap.sh -q &&\
-	rm esa-snap.sh &&\
-    snap --nosplash --nogui --modules --update-all 
+    rm esa-snap.sh &&\
+    snap --nosplash --nogui --modules --update-all
+
 
 # Install GDAL and python
 RUN add-apt-repository ppa:ubuntugis/ppa &&\ 
     apt-get update &&\
     apt-get install -y gdal-bin libgdal-dev &&\
     export CPLUS_INCLUDE_PATH=/usr/include/gdal &&\ 
-    export C_INCLUDE_PATH=/usr/include/gdal &&\
-	pip install numpy &&\
-    pip install gdal==$(gdalinfo --version | cut -d' ' -f2 | cut -d',' -f1)
+    export C_INCLUDE_PATH=/usr/include/gdal
+RUN pip install numpy &&\
+    pip install wheel &&\
+    pip install GDAL==$(gdal-config --version)
 
 # Install other python dependencies
 COPY requirements.txt .
