@@ -4,11 +4,11 @@ SHELL_HELPERS:=$(wildcard shell/docker*.sh)
 usage:
 	@echo "Targets:"
 	@echo
-	@echo "senprep : python preprocessing flows for Sentinel ARD"
+	@echo "build : Build docker image for running snap download and/or processing"
 	@echo "helpers : copy shell helper scripts to /usr/local/bin"
 
-senprep: Dockerfile-senprep ${PY_SRC}
-	docker build --network=host -f Dockerfile-senprep -t senprep:latest --force-rm=True .
+build: Dockerfile ${PY_SRC}
+	docker build --network=host -f Dockerfile -t senprep:latest --force-rm=True .
 
 helpers: ${SHELL_HELPERS}
 	@echo "Copying scripts from `pwd`/shell into /usr/local/bin"

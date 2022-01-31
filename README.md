@@ -56,7 +56,7 @@ python requirements.
 From the root of the repository, the docker image can be built using:
 
 ``` bash
-docker build --network=host -f Dockerfile-senprep -t senprep:latest --force-rm=True .
+docker build --network=host -f Dockerfile -t senprep:latest --force-rm=True .
 ```
 
 ...which will create an image tagged `senprep:latest`. (You can also install via
