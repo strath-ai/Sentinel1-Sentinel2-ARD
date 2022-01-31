@@ -53,6 +53,7 @@ class SentinelDownload(FlowSpec):
         """
         # Need to wrap the metaflow parameters to modify with the mount path
         # since we're potentially/usually running from within Docker
+        global SENTINEL_ROOT
         curdir = os.getcwd()
         if self.mount:
             curdir = self.mount
@@ -169,7 +170,7 @@ class SentinelDownload(FlowSpec):
                     )
             else:
                 raise ValueError("Invalid odata. No alternate downloader for offline product.")
-            if result != 0:
+            if result:
                 self.failed.append((product.uuid, result))
             else:
                 self.downloaded.append(product.uuid)

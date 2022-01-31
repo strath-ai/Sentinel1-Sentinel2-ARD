@@ -1015,7 +1015,8 @@ def download_from_googlecloud(client, bucket, blob_prefix, productname, rootdir=
         else:
             filename = blob.name.split("/")[-1]
             filepath = Path(rootdir) / productname / filename 
-            return blob.download_to_filename(filepath)
+            blob.download_to_filename(filepath)
+            return 0
 
 
 def download_S2_GCS_py(s2_product, credentials, **kwargs):
@@ -1045,7 +1046,8 @@ def download_S2_GCS_py(s2_product, credentials, **kwargs):
     client = storage.Client()
     bucket = client.bucket("gcp-public-data-sentinel-2")
     blob_prefix = "L2/tiles/{}/{}/{}/{}.SAFE/".format(utm, latb, square, productname)
-    return download_from_googlecloud(client, bucket, blob_prefix, productname, outdir)
+    download_from_googlecloud(client, bucket, blob_prefix, productname, outdir)
+    return 0
 
 
 def download_S2_GCS(s2_product, credentials=None, **kwargs):

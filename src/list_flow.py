@@ -72,6 +72,8 @@ class SnapProcess(FlowSpec):
             df = gpd.GeoDataFrame(
                 product, geometry="geometry", crs="epsg:4326"
             ).reset_index(drop=True)
+            for j, item in enumerate(df.title.tolist()):
+                print("{}/{}) {}".format(product_set_num+1, j+1, item))
         self.next(self.end)
     
     @step
