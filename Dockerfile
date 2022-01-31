@@ -1,5 +1,6 @@
 # set base image (host OS)
 FROM ubuntu:18.04
+ARG DEBIAN_FRONTEND=noninteractive
 
 # Install useful prerequisites
 RUN apt-get update && apt-get upgrade -y &&\
@@ -20,12 +21,13 @@ RUN apt-get update && apt-get upgrade -y &&\
 WORKDIR /code
 
 # Install SNAP / GPT
-COPY install-snap.sh .
+COPY update-snap-modules.sh .
 RUN curl -s https://download.esa.int/step/snap/8.0/installers/esa-snap_sentinel_unix_8_0.sh -o esa-snap.sh &&\
     chmod +x esa-snap.sh &&\
     ./esa-snap.sh -q &&\
     rm esa-snap.sh &&\
-    snap --nosplash --nogui --modules --update-all
+    chmod +x update-snap-modules.sh && ./update-snap-modules.sh
+    # snap --nosplash --nogui --modules --update-all
 
 
 # Install GDAL and python
@@ -35,7 +37,7 @@ RUN add-apt-repository ppa:ubuntugis/ppa &&\
     export CPLUS_INCLUDE_PATH=/usr/include/gdal &&\ 
     export C_INCLUDE_PATH=/usr/include/gdal
 RUN pip install numpy &&\
-    pip install wheel &&\
+    pip install wheel setuptools==58.0 &&\
     pip install GDAL==$(gdal-config --version)
 
 # Install other python dependencies
@@ -46,10 +48,12 @@ ENV PATH="/usr/local/snap/bin:${PATH}"
 
 COPY src/ src/
 
-
 # command to run on container start
 # 'bash' entrypoint is for debugging
 # ENTRYPOINT ["bash"]
 # ...otherwise, run 'senprep', with whatever command the user gives
-ENTRYPOINT [ "python", "-m", "src.senprep" ] 
-CMD ["list"]
+COPY run/snap /usr/bin/
+RUN chmod +x /usr/bin/snap
+ENV USERNAME=metaflow
+ENTRYPOINT ["/usr/bin/snap"] 
+CMD []

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+command=$1; shift
+
+case $command in
+    list) 
+        python -m src.list_flow --no-pylint $@
+        ;;
+    download) 
+        python -m src.download_flow --no-pylint $@
+        ;;
+    snap) 
+        python -m src.snap_flow --no-pylint $@
+        ;;
+    *)
+        echo "Sentinel1-Sentinel2-ARD"
+        echo
+        echo "Three scripts are provided: list, download, and run."
+        echo 
+        echo "- 'list' will show the products that would be used."
+        echo "- 'download' retrieves products from relevant endpoints."
+        echo "- 'snap' runs the ARD framework with preprocessing, cropping, and patch generation."
+        echo
+        echo "Run 'list help', 'download help', or 'snap help' to get full usage information."
+        ;;
+esac
+# python -m src.list_flow --no-pylint $@

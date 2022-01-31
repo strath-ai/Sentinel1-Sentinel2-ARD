@@ -13,3 +13,11 @@ pyperclip
 docopt
 Rtree
 opencv-python
+subprocess32
+utm
+psycopg2
+GeoAlchemy2
+psycopg-postgis
+omegaconf
+metaflow
+google-cloud-storage
