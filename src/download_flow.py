@@ -104,8 +104,9 @@ class SentinelDownload(FlowSpec):
         if self.cache_db_config:  # if we have a config, we should cache
             db = CacheDB(self.cfg, self.cache_db_config)
 
+        filter_clouds = self.cfg.get("cloud_mask_filtering", False)
         self.product_list, self.other_find_results = finder(
-            self.cfg, self.credentials)
+            self.cfg, self.credentials, cloud_mask_filtering=filter_clouds)
 
         self.products = []
         for (product_set_num, product_set) in enumerate(self.product_list):
@@ -157,7 +158,7 @@ class SentinelDownload(FlowSpec):
             #         product.uuid, directory_path=self.dir_out, checksum=True)
             if s1_or_s2 == "s2":
                 print(" - (offline S2 -> GCS)")
-                result = senprep.download_S2_GCS_py(product, credentials=self.credentials_file_google, outdir=self.dir_out)
+                result = senprep.download_S2_GCS(product, credentials=self.credentials_file_google, outdir=self.dir_out)
             elif s1_or_s2 == "s1":
                 print(" - (offline S1 -> NOAA)")
                 if not earthdata_auth:

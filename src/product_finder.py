@@ -44,12 +44,12 @@ def product_finder(func):
 
 
 @product_finder
-def s1(config, credentials):
+def s1(config, credentials, **kwargs):
     assert "Finding S1 products NOT IMPLEMENTED"
 
 
 @product_finder
-def s2(config, credentials):
+def s2(config, credentials, **kwargs):
     """Find S2 products.
 
     Arguments
@@ -118,7 +118,7 @@ def s2(config, credentials):
 
 
 @product_finder
-def s2_with_previous_s1(config, credentials):
+def s2_with_previous_s1(config, credentials, **kwargs):
     """Find pairs of S2 and S1 products.
 
     The S1 product must be in the week before the matching S2 product.
@@ -134,6 +134,11 @@ def s2_with_previous_s1(config, credentials):
     credentials : str
         filename for sentinelsat api credentials
 
+    Keyword Arguments
+    -----------------
+    cloud_mask_filtering : bool
+        Download cloud masks to determine whether ROI is cloud covered
+
     Returns
     -------
     products : List of [(S1 product, S2 product), (ROI, ROI_number)]
@@ -147,6 +152,8 @@ def s2_with_previous_s1(config, credentials):
     roi = roiutil.ROI(config["geojson"])
 
     other_return_data = dict()
+
+    cloud_mask_filtering = kwargs.get('cloud_mask_filtering', False)
 
     # Find _ALL_ products within the range, and then filter to a
     # pair of S2 and S1 per week
@@ -185,18 +192,30 @@ def s2_with_previous_s1(config, credentials):
     n_weeks = math.ceil((end_s2 - start_s2).days / 7)
     week_starts = start_s2 + np.arange(n_weeks) * timedelta(days=7)
 
+    s2_sort_params = ["overlap_area", "cloudcoverpercentage", "beginposition"]
+    s2_sort_ascending = [False, True, True]
+    if cloud_mask_filtering:
+        # Sort additionally by scl_area, rather than cloudcoverpercentage
+        s2_sort_ascending[1] = False
+        s2_sort_params[1] = "SCL_area"
+
     product_map = pd.DataFrame(columns=["week_start", "S1", "S2", "ROI", "ROI_area"])
     used_s1 = []
     for week_start in week_starts:
         week_start = datetime(week_start.year, week_start.month, week_start.day)
         week_end = week_start + timedelta(days=6)
         week_end = datetime(week_end.year, week_end.month, week_end.day)
-        mask = (s2_products.beginposition >= week_start) & (
-            s2_products.beginposition < week_end
-        )
+        after_start = s2_products.beginposition >= week_start
+        before_end = s2_products.beginposition < week_end
+        mask = after_start & before_end
         s2_thisweek = s2_products[mask]
+
+        #...cloud mask filtering here?
+        if cloud_mask_filtering:
+            s2_thisweek = senprep.add_cloud_cover_columns(s2_thisweek, roi.shape)
+
         s2_thisweek_filtered, roi_table = senprep.select_S2(
-            senprep.sort_S2(s2_thisweek, roi.shape), roi.shape
+            senprep.sort_S2(s2_thisweek, roi.shape, sorting_params=s2_sort_params, sorting_params_ascending=s2_sort_ascending), roi.shape
         )
         # TODO add check for 's2_thisweek_filtered.empty'
 
@@ -249,7 +268,7 @@ def s2_with_previous_s1(config, credentials):
 
 
 @product_finder
-def s2_with_previous_two_s1_with_same_orbit(config, credentials):
+def s2_with_previous_two_s1_with_same_orbit(config, credentials, **kwargs):
     """Find S2,S1,S1_old.
 
     The S3 must have the same 'relative orbit', which is ~12days flyby time."""
@@ -281,6 +300,7 @@ def s2_with_previous_two_s1_with_same_orbit(config, credentials):
     api = senprep.load_api(credentials)
 
     roi = roiutil.ROI(config["geojson"])
+    cloud_mask_filtering = kwargs.get('cloud_mask_filtering', False)
 
     other_return_data = dict()
 
@@ -329,6 +349,14 @@ def s2_with_previous_two_s1_with_same_orbit(config, credentials):
     )
     used_s1 = []
     used_s1_old = []
+
+    s2_sort_params = ["overlap_area", "cloudcoverpercentage", "beginposition"]
+    s2_sort_ascending = [False, True, True]
+    if cloud_mask_filtering:
+        # Sort additionally by scl_area, rather than cloudcoverpercentage
+        s2_sort_ascending[1] = False
+        s2_sort_params[1] = "SCL_area"
+
     # print(s2_products.beginposition)
     for week_start, week_end in week_boundaries:
         # print(week_start, 'to', week_end)
@@ -338,8 +366,13 @@ def s2_with_previous_two_s1_with_same_orbit(config, credentials):
             s2_products.beginposition <= week_end
         )
         s2_thisweek = s2_products[mask]
+
+        if cloud_mask_filtering:
+            s2_thisweek = senprep.add_cloud_cover_columns(s2_thisweek, roi.shape)
+
         s2_thisweek_filtered, ROI_table = senprep.select_S2(
-            senprep.sort_S2(s2_thisweek, roi.shape), roi.shape
+            senprep.sort_S2(s2_thisweek, roi.shape, sorting_params=s2_sort_params, sorting_params_ascending=s2_sort_ascending), 
+            roi.shape
         )
         # print("\nWeek {week_start} to {week_end} has {pct}% coverage".format(
         #     week_start=week_start,

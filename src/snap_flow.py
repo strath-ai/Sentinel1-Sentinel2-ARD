@@ -94,8 +94,9 @@ class SnapProcess(FlowSpec):
     def find_products(self):
         """Find proeucts using a callback from `product_finder.SentinelProductFinder`."""
         finder = getattr(product_finder, self.cfg["callback_find_products"])
+        filter_clouds = self.cfg.get("cloud_mask_filtering", False)
         self.product_list, self.other_find_results = finder(
-            self.cfg, self.credentials)
+            self.cfg, self.credentials, cloud_mask_filtering=filter_clouds)
         print(len(self.product_list), "sets of products found")
 
         if self.cache_db_config:  # if we have a config, we should cache

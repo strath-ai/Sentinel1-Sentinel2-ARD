@@ -62,8 +62,9 @@ class SnapProcess(FlowSpec):
     def find_products(self):
         """Find products using a callback from `product_finder.SentinelProductFinder`."""
         finder = getattr(product_finder, self.cfg["callback_find_products"])
+        filter_clouds = self.cfg.get("cloud_mask_filtering", False)
         self.product_list, self.other_find_results = finder(
-            self.cfg, self.credentials)
+            self.cfg, self.credentials, cloud_mask_filtering=filter_clouds)
         print(len(self.product_list), "sets of products found")
         print("Each is a tuple of length:", len(self.product_list[0]['ids']))
 

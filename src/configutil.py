@@ -88,6 +88,12 @@ def __ask_for_dates():
     return date_start, date_end
 
 
+def __ask_for_cloud_filtering():
+    cloud_mask_filtering = input("Choose based on cloud coverage? [Y/n]")
+    if cloud_mask_filtering:
+        return cloud_mask_filtering[0] in 'Yy'
+    return False
+
 
 def create(paste_geojson=False):
     """Create a SentinelPreprocessor configuration file."""
@@ -99,6 +105,7 @@ def create(paste_geojson=False):
     finder_callback = __ask_for_finder_callback()
     snap_callback = __ask_for_snap_callback()
     bands_s1, bands_s2 = __ask_for_bands()
+    cloud_mask_filtering = __ask_for_cloud_filtering()
 
     config_dir = Path("configurations")
     config_dir.mkdir(exist_ok=True, parents=True)
@@ -109,6 +116,7 @@ def create(paste_geojson=False):
         "size": size,
         "overlap": overlap,
         "cloudcover": cloudcover,
+        "cloud_mask_filtering": cloud_mask_filtering,
         "callback_find_products": finder_callback,
         "callback_snap": snap_callback,
         "bands_S1": bands_s1,
