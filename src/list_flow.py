@@ -30,7 +30,7 @@ except Exception as E:
 SENTINEL_ROOT = "/var/satellite-data/"
 
 
-class SnapProcess(FlowSpec):
+class ListProcess(FlowSpec):
     """SenPrep v2. Implemented through callbacks."""
 
     config = Parameter("config", help="Configuration json", required=True)
@@ -84,4 +84,4 @@ class SnapProcess(FlowSpec):
 
 
 if __name__ == "__main__":
-    SnapProcess()
+    ListProcess()
