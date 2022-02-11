@@ -79,6 +79,7 @@ SENTINELSAT_CONFIG_RESULTS_SCHEMA = [
 
 # // Could probably just replace this with TEXT inside config_results
 # Enum senprep_result {
+#   crop
 #   collocation
 #   zip
 # }
@@ -158,7 +159,8 @@ class CacheDB:
                 raise e
 
     def add_roi(self):
-        poly = roiutil.ROI(self.config["geojson"]).to_multipolygon()
+        roi = roiutil.ROI(self.config["geojson"])
+        poly = roi.to_multipolygon()
         self.con.execute(
             f"""
             insert into region_of_interest (roi)
@@ -211,7 +213,7 @@ class CacheDB:
         df_already_in_db = sentinelsat_rows[
             sentinelsat_rows.uuid.isin(existing)
         ].uuid.tolist()
-        cols = [col[0].lower() for col in SENTINELSAT_RESPONSE_SCHEMA]
+        cols = [col[0] for col in SENTINELSAT_RESPONSE_SCHEMA]
         for uuid in df_already_in_db:
             print(f"ALREADY IN DB: Sentinelsat_response {uuid}")
         sentinelsat_rows[~sentinelsat_rows.uuid.isin(existing)][cols].to_postgis(

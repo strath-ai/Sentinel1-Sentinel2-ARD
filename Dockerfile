@@ -29,6 +29,8 @@ RUN curl -s https://download.esa.int/step/snap/8.0/installers/esa-snap_sentinel_
     chmod +x update-snap-modules.sh && ./update-snap-modules.sh
     # snap --nosplash --nogui --modules --update-all
 
+# Install google cloud tools
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - && apt-get update -y && apt-get install google-cloud-sdk -y
 
 # Install GDAL and python
 RUN add-apt-repository ppa:ubuntugis/ppa &&\ 
@@ -52,8 +54,9 @@ COPY src/ src/
 # 'bash' entrypoint is for debugging
 # ENTRYPOINT ["bash"]
 # ...otherwise, run 'senprep', with whatever command the user gives
-COPY run/snap /usr/bin/
-RUN chmod +x /usr/bin/snap
+COPY run/snap run/dispatcher.sh /usr/bin/
+RUN chmod +x /usr/bin/snap /usr/bin/dispatcher.sh
+RUN mkdir /temp
 ENV USERNAME=metaflow
-ENTRYPOINT ["/usr/bin/snap"] 
+ENTRYPOINT ["/usr/bin/dispatcher.sh"] 
 CMD []

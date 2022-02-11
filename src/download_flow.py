@@ -85,8 +85,8 @@ class SentinelDownload(FlowSpec):
                 open(os.path.join(curdir, self.db_config)))
             db = CacheDB(self.cfg, self.cache_db_config)
             print("Cache DB instance set up for flow.")
-            db.add_config()
-            db.add_roi()
+            db.add_config(self.cfg)
+            db.add_roi(self.cfg)
         print("FINDER", self.cfg["callback_find_products"])
         self.next(self.find_products)
 
@@ -101,23 +101,25 @@ class SentinelDownload(FlowSpec):
         [id1, id2, id3, id4]
         """
         finder = getattr(product_finder, self.cfg["callback_find_products"])
-        if self.cache_db_config:  # if we have a config, we should cache
-            db = CacheDB(self.cfg, self.cache_db_config)
-
         filter_clouds = self.cfg.get("cloud_mask_filtering", False)
         self.product_list, self.other_find_results = finder(
             self.cfg, self.credentials, cloud_mask_filtering=filter_clouds)
+        print(len(self.product_list), "sets of products found")
 
+        if self.cache_db_config:  # if we have a config, we should cache
+            db = CacheDB(self.cfg, self.cache_db_config)
+        
         self.products = []
         for (product_set_num, product_set) in enumerate(self.product_list):
             product = product_set["ids"]
             self.products.extend(product)
+            df = gpd.GeoDataFrame(
+                product, geometry="geometry", crs="epsg:4326"
+            ).reset_index(drop=True)
             if self.cache_db_config:  # if we have a config, we should cache
-                df = gpd.GeoDataFrame(
-                    product, geometry="geometry", crs="epsg:4326"
-                ).reset_index(drop=True)
                 db.add_sentinelsat_mirror(df)
-                db.add_config_response(self.cfg, product_set_num, df)
+                db.add_config_response(product_set_num, df)
+
         self.next(self.download)
 
     @step
@@ -150,17 +152,12 @@ class SentinelDownload(FlowSpec):
             metadata = api.get_product_odata(product.uuid)
             s1_or_s2 = metadata["title"][:2].lower()
             result = False
-            # Sentinelsat version of download currently not used
-            # as had some issues with timeouts and parallelisation downloads.
-            # if metadata["Online"] == True:
-            #     print(" - (online -> SentinelSat)")
-            #     result = api.download(
-            #         product.uuid, directory_path=self.dir_out, checksum=True)
             if s1_or_s2 == "s2":
-                print(" - (offline S2 -> GCS)")
+                print(" - (S2 from GCS)")
+                senprep.authenticate_google_cloud(credentials_file=self.credentials_file_google)
                 result = senprep.download_S2_GCS(product, credentials=self.credentials_file_google, outdir=self.dir_out)
             elif s1_or_s2 == "s1":
-                print(" - (offline S1 -> NOAA)")
+                print(" - (S1 from NOAA)")
                 if not earthdata_auth:
                     print("NO EARTHDATA CREDENTIALS. FAIL.")
                 else:
@@ -171,7 +168,7 @@ class SentinelDownload(FlowSpec):
                     )
             else:
                 raise ValueError("Invalid odata. No alternate downloader for offline product.")
-            if result:
+            if result != 0:
                 self.failed.append((product.uuid, result))
             else:
                 self.downloaded.append(product.uuid)

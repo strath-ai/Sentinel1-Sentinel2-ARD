@@ -11,7 +11,8 @@ from descartes.patch import PolygonPatch
 from sentinelsat import read_geojson, geojson_to_wkt
 from shapely.geometry import Polygon, MultiPolygon, shape
 from shapely.ops import transform
-from shapely import wkt
+from shapely.wkt import dumps as wktdump
+from shapely.wkt import loads as wktload
 
 
 class ROI:
@@ -82,7 +83,9 @@ class ROI:
         return ROI(features)
 
     def to_multipolygon(self):
-        return MultiPolygon([wkt.loads(self.shape.to_wkt())])
+        print(self.shape)
+        print(self.shape.__repr__())
+        return MultiPolygon([wktload(wktdump(self.shape))])
 
 
 def export_to_file(roi, filename, crs):
