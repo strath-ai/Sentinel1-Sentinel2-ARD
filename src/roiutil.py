@@ -83,8 +83,6 @@ class ROI:
         return ROI(features)
 
     def to_multipolygon(self):
-        print(self.shape)
-        print(self.shape.__repr__())
         return MultiPolygon([wktload(wktdump(self.shape))])
 
 

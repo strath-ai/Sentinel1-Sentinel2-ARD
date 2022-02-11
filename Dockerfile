@@ -17,9 +17,6 @@ RUN apt-get update && apt-get upgrade -y &&\
     # Remove apt cache
     rm -rf /var/lib/apt/lists/*
 
-# set the working directory in the container
-WORKDIR /code
-
 # Install SNAP / GPT
 COPY update-snap-modules.sh .
 RUN curl -s https://download.esa.int/step/snap/8.0/installers/esa-snap_sentinel_unix_8_0.sh -o esa-snap.sh &&\
@@ -48,7 +45,7 @@ RUN pip install -r requirements.txt
 # Add 'gpt' directory to PATH
 ENV PATH="/usr/local/snap/bin:${PATH}"
 
-COPY src/ src/
+COPY src/ /src
 
 # command to run on container start
 # 'bash' entrypoint is for debugging
@@ -56,7 +53,8 @@ COPY src/ src/
 # ...otherwise, run 'senprep', with whatever command the user gives
 COPY run/snap run/dispatcher.sh /usr/bin/
 RUN chmod +x /usr/bin/snap /usr/bin/dispatcher.sh
-RUN mkdir /temp
+RUN mkdir -p /temp/user
 ENV USERNAME=metaflow
 ENTRYPOINT ["/usr/bin/dispatcher.sh"] 
+WORKDIR /temp/user
 CMD []

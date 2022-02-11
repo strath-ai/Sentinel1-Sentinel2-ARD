@@ -3,16 +3,19 @@ command=$1; shift
 
 case $command in
     list|l) 
-        USER=metaflow python -m src.list_flow $@
+        USER=metaflow python /src/list_flow.py $@
         ;; #---------------------------------------
     download|dl) 
-        USER=metaflow python -m src.snap_flow --nosnap true $@
+        USER=metaflow python /src/snap_flow.py --nosnap true $@
         ;; #---------------------------------------
     snap|snapper|process) 
-        USER=metaflow python -m src.snap_flow $@
+        USER=metaflow python /src/snap_flow.py $@
         ;; #---------------------------------------
     config)
-        python -m src.configutil $@ 
+        python /src/configutil.py $@ 
+        ;; #---------------------------------------
+    bash) 
+        bash 
         ;; #---------------------------------------
     *)
         echo "Sentinel1-Sentinel2-ARD Method Dispatcher"
