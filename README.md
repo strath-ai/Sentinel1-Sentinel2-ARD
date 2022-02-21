@@ -3,6 +3,25 @@
 Creates analysis read data (ARD) from sentinel data. Creates multi-modal and/or
 multi-temporal Sentinel-1 and Sentinel-2 ARD.
 
+If you find this repository useful, please cite with:
+
+```bibtex
+@article{Upadhyay2022,
+  # doi = {ACCEPTED/IN PRESS},
+  url = {ACCEPTED/IN PRESS},
+  year = {2022},
+  month = feb,
+  publisher = {{MDPI} {AG}},
+  volume = {14},
+  number = {4},
+  pages = {21},
+  author = {Priti Upadhyay and Mikolaj Czerkawski and Christopher Davison and Javier Cardona and Malcolm Macdonald and Ivan Andonovic and Craig Michie and Robert Atkinson and Nikela Papadopoulou and Konstantinos Nikas and Christos Tachtatzis},
+  title         = {A flexible multi-temporal and multi-modal framework for Sentinel-1 and Sentinel-2 Analysis Ready Data.},
+  journal = {Remote Sensing}
+}
+```
+
+
 ## Running the pipeline
 
 An example configuration is provided which will only use a single pair of
