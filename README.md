@@ -6,18 +6,17 @@ multi-temporal Sentinel-1 and Sentinel-2 ARD.
 If you find this repository useful, please cite with:
 
 ```bibtex
-@article{Upadhyay2022,
-  # doi = {ACCEPTED/IN PRESS},
-  url = {ACCEPTED/IN PRESS},
-  year = {2022},
-  month = feb,
-  publisher = {{MDPI} {AG}},
-  volume = {14},
-  number = {4},
-  pages = {21},
-  author = {Priti Upadhyay and Mikolaj Czerkawski and Christopher Davison and Javier Cardona and Malcolm Macdonald and Ivan Andonovic and Craig Michie and Robert Atkinson and Nikela Papadopoulou and Konstantinos Nikas and Christos Tachtatzis},
-  title         = {A flexible multi-temporal and multi-modal framework for Sentinel-1 and Sentinel-2 Analysis Ready Data.},
-  journal = {Remote Sensing}
+@article{s1s2_ard,
+  AUTHOR = {Upadhyay, Priti and Czerkawski, Mikolaj and Davison, Christopher and Cardona, Javier and Macdonald, Malcolm and Andonovic, Ivan and Michie, Craig and Atkinson, Robert and Papadopoulou, Nikela and Nikas, Konstantinos and Tachtatzis, Christos},
+  TITLE = {A Flexible Multi-Temporal and Multi-Modal Framework for Sentinel-1 and Sentinel-2 Analysis Ready Data},
+  JOURNAL = {Remote Sensing},
+  VOLUME = {14},
+  YEAR = {2022},
+  NUMBER = {5},
+  ARTICLE-NUMBER = {1120},
+  URL = {https://www.mdpi.com/2072-4292/14/5/1120},
+  ISSN = {2072-4292},
+  DOI = {10.3390/rs14051120}
 }
 ```
 
