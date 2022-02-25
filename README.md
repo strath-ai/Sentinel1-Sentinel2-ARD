@@ -3,6 +3,10 @@
 Creates analysis read data (ARD) from sentinel data. Creates multi-modal and/or
 multi-temporal Sentinel-1 and Sentinel-2 ARD.
 
+Details can be found in the peer paper here:
+
+[A Flexible Multi-Temporal and Multi-Modal Framework for Sentinel-1 and Sentinel-2 Analysis Ready Data](https://www.mdpi.com/2072-4292/14/5/1120)
+
 If you find this repository useful, please cite with:
 
 ```bibtex
