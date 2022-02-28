@@ -7,6 +7,8 @@ Details can be found in the peer paper here:
 
 [A Flexible Multi-Temporal and Multi-Modal Framework for Sentinel-1 and Sentinel-2 Analysis Ready Data](https://www.mdpi.com/2072-4292/14/5/1120)
 
+The paper was published using `v1.0.1` of the code, available here [v1.0.1](https://github.com/cidcom/Sentinel1-Sentinel2-ARD/releases/tag/v1.0.1).
+
 If you find this repository useful, please cite with:
 
 ```bibtex
