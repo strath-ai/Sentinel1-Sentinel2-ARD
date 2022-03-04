@@ -19,7 +19,8 @@ RUN apt-get update && apt-get upgrade -y &&\
 
 # Install SNAP / GPT
 COPY update-snap-modules.sh .
-RUN curl -s https://download.esa.int/step/snap/8.0/installers/esa-snap_sentinel_unix_8_0.sh -o esa-snap.sh &&\
+# RUN curl -s https://download.esa.int/step/snap/8.0/installers/esa-snap_sentinel_unix_8_0.sh -o esa-snap.sh &&\
+RUN curl -s http://step.esa.int/downloads/7.0/installers/esa-snap_sentinel_unix_7_0.sh -o esa-snap.sh &&\
     chmod +x esa-snap.sh &&\
     ./esa-snap.sh -q &&\
     rm esa-snap.sh &&\

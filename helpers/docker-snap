@@ -44,7 +44,7 @@ def main(output, download, no_flow, no_snap, version, args):
         f"senprep:{version}",
         command,
         "run",
-        "--mount=/here",    
+        "--mount=/here",
         * args,
     ]
 
@@ -53,7 +53,7 @@ def main(output, download, no_flow, no_snap, version, args):
     log(f"MNT: {output} -> <container>:/var/satellite-data")
     log(f"CMD: {command}")
     if not os.path.exists(".metaflow"):
-        os.Mkdir(".metaflow")
+        os.mkdir(".metaflow")
     log("-" * 40)
 
     cmd = subprocess.run(dockerArgs)

@@ -2,6 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 
+import requests
 from google.cloud import storage
 
 SENTINEL_ROOT = os.environ.get("SENTINEL_ROOT", "/var/satellite-data/")
@@ -19,7 +20,7 @@ def download_from_googlecloud(client, bucket, blob_prefix, productname, rootdir=
             download_from_googlecloud(client, bucket, prefix_new, productname_new, rootdir)
         else:
             filename = blob.name.split("/")[-1]
-            filepath = Path(rootdir) / productname / filename 
+            filepath = Path(rootdir) / productname / filename
             blob.download_to_filename(filepath)
             return 0
 
@@ -87,7 +88,7 @@ def download_S2_GCS(s2_product, credentials=None, **kwargs):
     if filepath.exists():
         print("S2 already downloaded")
         return 0
-    
+
     proc_output = subprocess.run(
         [
             "gsutil",
@@ -132,8 +133,8 @@ def download_S2_AWS(s2_product, **kwargs):
             "aws",
             url,
             filename,
-            "--request-payer", 
-            "requester", 
+            "--request-payer",
+            "requester",
             "--recursive"
         ],
         stdout=subprocess.PIPE,
@@ -188,8 +189,8 @@ def download_S1_AWS(s1_product, **kwargs):
             "aws", "s3", "cp",
             url,
             filename,
-            "--request-payer", 
-            "requester", 
+            "--request-payer",
+            "requester",
             "--recursive"
         ],
         stdout=subprocess.PIPE,
@@ -218,7 +219,7 @@ def download_S1_NOAA_py(s1_product, auth=None, **kwargs):
     else:
         url = "https://datapool.asf.alaska.edu/{}_HD/S{}/{}.zip"
     url = url.format(producttype, satellite, productname)
-   
+
     err = 0
     p_out = Path(outdir) / (productname + ".zip")
     if p_out.exists():
@@ -235,7 +236,7 @@ def download_S1_NOAA_py(s1_product, auth=None, **kwargs):
         else:
             err = -1
         s.close()
-    return err 
+    return err
 
 
 def download_S1_NOAA(s1_product, auth=None, **kwargs):

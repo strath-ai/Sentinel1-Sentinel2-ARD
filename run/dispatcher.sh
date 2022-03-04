@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 command=$1; shift
 
+echo $@
 case $command in
     list|l) 
         USER=metaflow python /src/list_flow.py $@
         ;; #---------------------------------------
     download|dl) 
-        USER=metaflow python /src/snap_flow.py --nosnap true $@
+        USER=metaflow python /src/snap_flow.py  $@ --nosnap true
         ;; #---------------------------------------
     snap|snapper|process) 
         USER=metaflow python /src/snap_flow.py $@

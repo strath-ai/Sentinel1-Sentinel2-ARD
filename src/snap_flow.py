@@ -158,7 +158,7 @@ class SnapProcess(FlowSpec):
         print(f"{len(products_already_downloaded)} already downloaded")
         print(f"{len(to_download)} to download")
         for i, product in enumerate(to_download):
-            print("DL {i+1}/{len(to_download)}: {product.uuid}", end="")
+            print(f"DL {i+1}/{len(to_download)}: {product.uuid}", end="")
             metadata = api.get_product_odata(product.uuid)
             s1_or_s2 = metadata["title"][:2].lower()
             result = False

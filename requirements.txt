@@ -21,3 +21,4 @@ psycopg-postgis
 omegaconf
 metaflow
 google-cloud-storage
+requests

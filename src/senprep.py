@@ -18,7 +18,7 @@ Commands:
 Options:
     CREATE command (configurations)
         -c                               Let user paste geojson, rather than ask for filename
-    LIST, DOWNLOAD, PROCESS, DOWNLOAD_PROCESS commands (satellite pipeline)        
+    LIST, DOWNLOAD, PROCESS, DOWNLOAD_PROCESS commands (satellite pipeline)
        --config CONFIG_FILE             File containing region file to preprocess
        --credentials CREDENTIAL_FILE    File containing sentinel API credentials [default: credentials.json]
        --rebuild                        Rebuild products
@@ -86,8 +86,8 @@ SENTINEL_STORAGE_PATH = "/var/satellite-data/Sentinel_Patches/"
 DEBUG = False
 
 # TODO - remove global variables
-# Global variables make it difficult to maintain code. 
-# Sentinel root and storage path are designed to be modified INSIDE USER CODE if necessary 
+# Global variables make it difficult to maintain code.
+# Sentinel root and storage path are designed to be modified INSIDE USER CODE if necessary
 # (e.g. import senprep... senprep.SENTINEL_ROOT = <some_server_specific_path>)
 # Changing the global variables means stuff like docker can easily screw up, as it expects sentinel_root
 # to be something specific in order to mount to the correct location.
@@ -126,13 +126,40 @@ def multipolygon_to_polygon(mpoly):
 
 
 def get_utm_crs(lat, lon):
-    utm_code =utm.from_latlon(lat, lon) ## (latitude, longitude)    
+    utm_code =utm.from_latlon(lat, lon) ## (latitude, longitude)
     if utm_code[3]>='N':
         hemisphere ='N'
     else:
-        hemisphere ='S'  
-    crs = pyproj.CRS("WGS 84 / UTM Zone "+str(utm_code[2])+hemisphere)    
+        hemisphere ='S'
+    crs = pyproj.CRS("WGS 84 / UTM Zone "+str(utm_code[2])+hemisphere)
     return crs
+
+
+class NoGoogleAuthError(Exception):
+    pass
+
+
+def authenticate_google_cloud(credentials_file=None):
+	key_file = None
+	auth_list = subprocess.run("gcloud auth list".split(" "), capture_output=True).stdout
+	active = [l for l in auth_list.splitlines() if l.startswith(b'* ')]
+	if active:
+		return
+
+	if credentials_file:
+		key_file = str(credentials_file)
+	elif os.path.exists("credentials_gs.json"):
+		key_file = "credentials_gs.json"
+	else:
+		raise NoGoogleAuthError("No credentials passed, credentials_gs.json, or active account.")
+	subprocess.run([
+		"gcloud",
+		"auth",
+		"activate-service-account",
+		"--key-file={}".format(key_file)
+	])
+
+
 
 
 def get_roi_cloud_cover(s2_product, ROI_footprint, print_plot = False):
@@ -143,10 +170,10 @@ def get_roi_cloud_cover(s2_product, ROI_footprint, print_plot = False):
     if not os.path.exists('./temp'):
         os.mkdir('./temp')
     save_filename = Path('./temp/{}.gml'.format(productname))
-    
+
     if not save_filename.exists():
         proc_output = subprocess.run(
-                [   "gsutil", 
+                [   "gsutil",
                      "-m",
                      "cp",
                      "-r",
@@ -159,7 +186,7 @@ def get_roi_cloud_cover(s2_product, ROI_footprint, print_plot = False):
          cloud_data = gpd.read_file(save_filename, layer=0)
     except ValueError:
         ### If cloud file empty
-        ROI_centroid = ROI_footprint.centroid.coords  
+        ROI_centroid = ROI_footprint.centroid.coords
         utm_crs = get_utm_crs(list(ROI_centroid)[0][1], list(ROI_centroid)[0][0])
         ROI_gdf = gpd.GeoDataFrame([1], geometry=[ROI_footprint], crs="epsg:4326")
         ROI_gdf_utm = ROI_gdf.to_crs(utm_crs)
@@ -170,7 +197,7 @@ def get_roi_cloud_cover(s2_product, ROI_footprint, print_plot = False):
         S2_utm_area = S2_utm.area
         cloud_free_area = ((ROI_gdf_utm.geometry[0].intersection(S2_utm)).area)/1e6 ### in km2
         return cloud_free_area
-        
+
     cloud_data['valid']=cloud_data.geometry.is_valid
     ### To turn invalid geometry to valid geometry
     cloud_data.geometry[cloud_data['valid']==False] = cloud_data.geometry[cloud_data['valid']==False].buffer(0)
@@ -181,19 +208,19 @@ def get_roi_cloud_cover(s2_product, ROI_footprint, print_plot = False):
     if cloud_clipped.empty == False:
         clipped_filename = Path('./temp/{}_clipped.gml'.format(productname))
 
-        cloud_clipped.to_file(clipped_filename, driver="GeoJSON")    
+        cloud_clipped.to_file(clipped_filename, driver="GeoJSON")
     wgs84 = pyproj.Proj(init="epsg:4326")
     utm = pyproj.Proj(init=str(cloud_data.crs))
     project = partial(pyproj.transform, wgs84, utm)
     S2_utm = transform(project, s2_product['geometry'])
-    
+
     if print_plot:
         cloud_clipped.plot(column='gml_id', legend=True)
         ROI_S2_bounds = (ROI_gdf_utm.geometry[0].intersection(S2_utm)).bounds
         plt.xlim([ROI_S2_bounds[0],ROI_S2_bounds[2]])
         plt.ylim([ROI_S2_bounds[1],ROI_S2_bounds[3]])
         plt.title(s2_product['title'])
-       
+
     S2_utm_area = S2_utm.area
     cloud_free_area = ((ROI_gdf_utm.geometry[0].intersection(S2_utm)).area - cascaded_union(cloud_clipped.geometry).area)/1e6 ### in km2
 #     print("cloud_free_area",cloud_free_area )
@@ -209,10 +236,10 @@ def get_scl_cloud_mask(s2_product, ROI_footprint, print_plot = False):
         os.mkdir('./temp')
 
     save_filename = Path('./temp/{}.jp2'.format(productname))
-    
+
     if not save_filename.exists():
         proc_output = subprocess.run(
-                [   "gsutil", 
+                [   "gsutil",
                      "-m",
                      "cp",
                      "-r",
@@ -229,7 +256,7 @@ def get_scl_cloud_mask(s2_product, ROI_footprint, print_plot = False):
     if ROI_utm_geometry.type =="Polygon":
         ROI_utm_geometry = MultiPolygon([ROI_utm_geometry])
     SCL_array, _ = mask(raster_SCL, ROI_utm_geometry  ,all_touched=True, invert=False, crop=True, pad=False, nodata =0)
-    cloud_array= (SCL_array>=CLOUD_MEDIUM_PROBABILITY) & (SCL_array<=THIN_CIRRUS)  
+    cloud_array= (SCL_array>=CLOUD_MEDIUM_PROBABILITY) & (SCL_array<=THIN_CIRRUS)
     if print_plot:
         plt.figure()
         plt.imshow(cloud_array.squeeze(), vmin=0, vmax =1,cmap='gray')
@@ -352,10 +379,10 @@ def find_S1(ROI_footprint, start_date, end_date, api, **kwargs):
 
     # TODO -- Priti, please explain what this code does, as it's quite unclear
     # and bits and pieces commented out
-    ###title =  s1_products_df.iloc[3]['title']# 
+    ###title =  s1_products_df.iloc[3]['title']#
     ##print('title', title)
     if n_prod >=1:
-        first_poly_coords = s1_products_df['geometry'][0].centroid.coords  
+        first_poly_coords = s1_products_df['geometry'][0].centroid.coords
         crs = get_utm_crs(first_poly_coords[0][1], first_poly_coords[0][0])
         #print('crs', crs)
         utm_geomtery = s1_products_df['geometry'].to_crs(crs=crs)
@@ -401,7 +428,7 @@ def find_S1_SLC(ROI_footprint, start_date, end_date, api, **kwargs):
              plot_Stiles_plus_ROI(ROI_footprint, s1_products_df, "blue", grid=False)
 
         if kwargs.get('verbose', False):
-           logging.info(f"Matching Sentinel-1 Products found from ({start_date} to {end_date-timedelta(days=1)}): {n_prod}")      
+           logging.info(f"Matching Sentinel-1 Products found from ({start_date} to {end_date-timedelta(days=1)}): {n_prod}")
 #     print("\nMatching Sentinel-1 Products found from",start_date, "to",end_date-timedelta(days=1),': ',n_prod)
     return s1_products_df
 
@@ -456,10 +483,10 @@ def find_S2(ROI_footprint, start_date, end_date, api, **kwargs):
     if n_prod >0:
         cloud_roi_table = []
         cloud_roi_scl_table= []
-        if cloud_mask_filtering:  
+        if cloud_mask_filtering:
              for i in range(0, s2_products_df.shape[0]):
-                 cloud_roi = get_roi_cloud_cover(s2_products_df.iloc[i], ROI_footprint, print_plot = False) 
-                 cloud_roi_scl = get_scl_cloud_mask(s2_products_df.iloc[i], ROI_footprint, print_plot = False) 
+                 cloud_roi = get_roi_cloud_cover(s2_products_df.iloc[i], ROI_footprint, print_plot = False)
+                 cloud_roi_scl = get_scl_cloud_mask(s2_products_df.iloc[i], ROI_footprint, print_plot = False)
                  cloud_roi_table.append(cloud_roi)
                  cloud_roi_scl_table.append(cloud_roi_scl)
              s2_products_df['ROI_cloud_free_area'] = cloud_roi_table
@@ -468,7 +495,7 @@ def find_S2(ROI_footprint, start_date, end_date, api, **kwargs):
 
 
              print( (s2_products_df[['title','ROI_cloud_free_area', 'SCL_area','cloudcoverpercentage']]).to_string(index=False))
-            
+
         else:
             print( (s2_products_df[['title', 'beginposition','cloudcoverpercentage']]).to_string(index=False))
         if not os.path.exists('./temp'):
@@ -532,9 +559,9 @@ def find_S1_IW_old(s1_products_df, api, **kwargs):
     -------
     geopandas.DataFrame of one s1 product
     """
-    
+
     s1_old_date = s1_products_df.beginposition.to_pydatetime()
-           
+
     # TODO -- Priti, can you add comments explaining the various timedeltas?
     # It's hard to go back and understand this code.
     start_old_s1 = date(s1_old_date.year,s1_old_date.month,s1_old_date.day) - timedelta(13)
@@ -555,7 +582,7 @@ def find_S1_IW_old(s1_products_df, api, **kwargs):
 #     print(f"\nCurrent S1 date {s1_old_date}")
 #     print(s1_products_df)
 #     print(f"\nMatching Old Sentinel-1 Products found from {start_old_s1} to {end_old_s1-timedelta(days=1)}: {n_prod}")
-    return s1_old_products_df 
+    return s1_old_products_df
 
 
 def sort_sentinel_products(products, ROI, sorting_params, sorting_params_ascending):
@@ -671,11 +698,11 @@ def sort_S2(s_products_df, ROI, **kwargs):
     with pd.option_context('mode.chained_assignment', None):
         s_products_df["overlap_area"] = s_products_df.geometry.intersection(ROI).area   # in km2
     if 'ROI_cloud_free_area' in sorting_params:
-        cloud_roi_table = []     
-        for i in range(0, s_products_df.shape[0]):            
-            cloud_roi = get_roi_cloud_cover(s_products_df.iloc[i], ROI)     
+        cloud_roi_table = []
+        for i in range(0, s_products_df.shape[0]):
+            cloud_roi = get_roi_cloud_cover(s_products_df.iloc[i], ROI)
             cloud_roi_table.append(cloud_roi)
-        s_products_df['ROI_cloud_free_area'] = cloud_roi_table  
+        s_products_df['ROI_cloud_free_area'] = cloud_roi_table
     s_products_df_sorted = s_products_df.sort_values(by=sorting_params, ascending=sorting_params_ascending)
     s_products_df_sorted = s_products_df_sorted[s_products_df_sorted["overlap_area"] > 0.0]
     return s_products_df_sorted
@@ -761,7 +788,7 @@ def select_sentinel_products(
     return s_final_products, ROI_table
 
 
-# TODO - These functions are getting messier and messier...each function should try and do 
+# TODO - These functions are getting messier and messier...each function should try and do
 # one specific thing, or they get very difficult to understand and work with
 # Can we take the plotting out of this?
 # --- maybe, return a list of polygons that this function selects, and then plot separately
@@ -774,7 +801,7 @@ def select_S1(s1_products_df, ROI, sorting_params=["overlap_area","beginposition
     s_products : sorted geopanda dataframe returned from sentinelsat API
                  based on "Percent_overlap" with ROI
     ROI        : Region of Interest
-    print_fig  : Boolean value, If passed True, prints all the figures 
+    print_fig  : Boolean value, If passed True, prints all the figures
     Returns list of Sentinel 1 products to download
     """
 
@@ -790,7 +817,7 @@ def select_S1(s1_products_df, ROI, sorting_params=["overlap_area","beginposition
         ax.set_xlabel("Longitude (degree)")
         display.display(plt.gcf())
         display.clear_output(wait=True)
-        
+
 
     column_label = ["Product_id", "overlap_area"] ## "overlap_area" is the actual area selected in the final selection list
                                                                   ## while the "Percent_area_covered" is the percentage for the covered area
@@ -801,18 +828,18 @@ def select_S1(s1_products_df, ROI, sorting_params=["overlap_area","beginposition
     iteration = 0
 
     ROI_table = []
-    
+
     ## Resort the the sentinel products
-    s_products = sort_S1(s1_products_df, Remaining_ROI,sorting_params=sorting_params, sorting_params_ascending=sorting_params_ascending)   
+    s_products = sort_S1(s1_products_df, Remaining_ROI,sorting_params=sorting_params, sorting_params_ascending=sorting_params_ascending)
     while Remaining_ROI.area >= 1e-10 and s_products.shape[0] > 0:
         #         time.sleep(3)
 
-        iteration = iteration + 1  
+        iteration = iteration + 1
         s_geometry = s_products.iloc[0]["geometry"]
         overlap = s_geometry.intersection(Remaining_ROI)
         data = [s_products.index[0], s_products.iloc[0]["overlap_area"]]
         s_table.append(data)
-        Remaining_ROI = Remaining_ROI.difference(s_geometry)      
+        Remaining_ROI = Remaining_ROI.difference(s_geometry)
         ROI_table.append(overlap)
 
         if kwargs.get('print_fig', False):
@@ -835,10 +862,10 @@ def select_S1(s1_products_df, ROI, sorting_params=["overlap_area","beginposition
         if Remaining_ROI.area >= 1e-10:
             s_products = sort_S1(s_products, Remaining_ROI,sorting_params=sorting_params, sorting_params_ascending=sorting_params_ascending)
 
-   
+
     s_final_df = pd.DataFrame(s_table, columns=column_label)
     s_final_products = s1_products_df.reindex(s_final_df["Product_id"])
-    s_final_products["Percent_area_covered"] = list(s_final_df["overlap_area"]/ROI.area*100) 
+    s_final_products["Percent_area_covered"] = list(s_final_df["overlap_area"]/ROI.area*100)
     s_final_products["Area_covered"] = list(s_final_df["overlap_area"])
     n_prod = s_final_products.shape[0]
     # if kwargs.get('verbose', False):
@@ -853,7 +880,7 @@ def select_S1(s1_products_df, ROI, sorting_params=["overlap_area","beginposition
     return s_final_products, ROI_table
 
 
-# TODO - These functions are getting messier and messier...each function should try and do 
+# TODO - These functions are getting messier and messier...each function should try and do
 # one specific thing, or they get very difficult to understand and work with
 # Can we take the plotting out of this?
 # --- maybe, return a list of polygons that this function selects, and then plot separately
@@ -892,7 +919,7 @@ def select_S2(s2_products_df, ROI,sorting_params=["overlap_area","cloudcoverperc
 
     ROI_table = []
     if 'ROI_cloud_free_area' in sorting_params:
-        cloud_free_area_table = []     
+        cloud_free_area_table = []
     ## Resort the list
     s_products =sort_S2(s2_products_df, Remaining_ROI, sorting_params=sorting_params, sorting_params_ascending=sorting_params_ascending)
     while Remaining_ROI.area >= 1e-10 and s_products.shape[0] > 0:
@@ -904,7 +931,7 @@ def select_S2(s2_products_df, ROI,sorting_params=["overlap_area","cloudcoverperc
              cloud_free_area_table.append( s_products.iloc[0]['ROI_cloud_free_area'])
         data = [s_products.index[0], s_products.iloc[0]["overlap_area"]]
         s_table.append(data)
-        
+
         Remaining_ROI = Remaining_ROI.difference(s_geometry)
 
         ROI_table.append(overlap)
@@ -924,7 +951,7 @@ def select_S2(s2_products_df, ROI,sorting_params=["overlap_area","cloudcoverperc
         # first find index of first row
         row1_index = s_products.index[0]
         s_products = s_products.drop(index=row1_index)
-        
+
         ## Resort the list
         if Remaining_ROI.area >= 1e-10:
              s_products =sort_S2(s_products, Remaining_ROI, sorting_params=sorting_params, sorting_params_ascending=sorting_params_ascending)
@@ -936,7 +963,7 @@ def select_S2(s2_products_df, ROI,sorting_params=["overlap_area","cloudcoverperc
     if 'ROI_cloud_free_area' in sorting_params:
              s_final_products['ROI_cloud_free_area'] =  cloud_free_area_table
     n_prod = s_final_products.shape[0]
-        
+
     # if kwargs.get('verbose', False):
     #     logging.info(f"Selected Sentinel-2 Products: {n_prod}")
     if not os.path.exists('./temp'):
@@ -1017,8 +1044,8 @@ def add_cloud_cover_columns(s2_products_df, ROI_footprint):
     cloud_roi_table = []
     cloud_roi_scl_table = []
     for i in range(0, s2_products_df.shape[0]):
-        cloud_roi = get_roi_cloud_cover(s2_products_df.iloc[i], ROI_footprint, print_plot = False) 
-        cloud_roi_scl = get_scl_cloud_mask(s2_products_df.iloc[i], ROI_footprint, print_plot = False) 
+        cloud_roi = get_roi_cloud_cover(s2_products_df.iloc[i], ROI_footprint, print_plot = False)
+        cloud_roi_scl = get_scl_cloud_mask(s2_products_df.iloc[i], ROI_footprint, print_plot = False)
         cloud_roi_table.append(cloud_roi)
         cloud_roi_scl_table.append(cloud_roi_scl)
     s2_products_df['ROI_cloud_free_area'] = cloud_roi_table
@@ -1078,7 +1105,7 @@ class SentinelPreprocessor:
         if self.primary=='S2':
             self.secondary='S1'
         elif self.primary=='S1':
-            self.secondary='S2'    
+            self.secondary='S2'
         self.skip_week = kwargs.get('skip_week', False)
         self.skip_secondary = kwargs.get('skip_secondary', False)
         self.full_collocation = kwargs.get('full_collocation', False)
@@ -1097,17 +1124,17 @@ class SentinelPreprocessor:
         self.secondary_S1_params=["overlap_area","abs_time_delta_from_primary_hrs"]
         self.secondary_S1_params_ascending =(False,True)
         self.cloud_mask_filtering = kwargs.get('cloud_mask_filtering', False)
-        if self.cloud_mask_filtering:            
+        if self.cloud_mask_filtering:
             self.primary_S2_params = ["overlap_area","SCL_area" , "beginposition"] # "ROI_cloud_free_area"
-            self.primary_S2_params_ascending = [False, False, True] ## 
+            self.primary_S2_params_ascending = [False, False, True] ##
             self.secondary_S2_params = ["overlap_area","ROI_cloud_free_area","abs_time_delta_from_primary_hrs"] #
-            self.secondary_S2_params_ascending = [False, False, True] ## 
+            self.secondary_S2_params_ascending = [False, False, True] ##
         else:
             self.primary_S2_params = ["overlap_area","cloudcoverpercentage","beginposition"] #
-            self.primary_S2_params_ascending = [False, True, True] ## 
+            self.primary_S2_params_ascending = [False, True, True] ##
             self.secondary_S2_params = ["overlap_area","cloudcoverpercentage","abs_time_delta_from_primary_hrs"] #
-            self.secondary_S2_params_ascending = [False, True, True] ##     
-    
+            self.secondary_S2_params_ascending = [False, True, True] ##
+
     def __make_roi_footprint(self, geojson):
         # Workaround to account for the fact that geojson_to_wkt was
         # working with read_geojson, which requires a file
@@ -1115,7 +1142,7 @@ class SentinelPreprocessor:
         f.write(geojson)
         f.seek(0)
         return geojson_to_wkt(read_geojson(f.name))
-    
+
 
     def __repr__(self):
         """Show region information."""
@@ -1132,75 +1159,75 @@ class SentinelPreprocessor:
         msg += f"\n> ROI       | {roi_msg}"
         msg += f"\n> AVAILABLE | {available_msg}"
         return msg
-    
+
     def find_primary(self, footprint,  start_date, end_date ):
 #         print("Finding primary product")
-        if self.primary =='S2': 
+        if self.primary =='S2':
             primary_products_df =find_S2(footprint, start_date, end_date, self.cloudcover, self.cloud_mask_filtering, self.api)
         elif self.primary =='S1':
             if self.S1_SLC:
                 primary_products_df =find_S1_SLC(footprint, start_date, end_date, self.api, plot_tiles=False)
-            else:    
+            else:
                 primary_products_df =find_S1(footprint, start_date, end_date, self.api, plot_tiles=False)
         return primary_products_df
-    
+
     def sort_primary(self, primary_products, footprint):
-        if self.primary =='S2': 
+        if self.primary =='S2':
             primary_products_sorted =sort_S2(primary_products, footprint, sorting_params=self.primary_S2_params, sorting_params_ascending=self.primary_S2_params_ascending)
             if self.cloud_mask_filtering:
                 print(primary_products_sorted[["title","SCL_area","cloudcoverpercentage", "overlap_area"]].to_string(index=False))
             else:
                 print(primary_products_sorted[["title","cloudcoverpercentage", "overlap_area"]].to_string(index=False))
-        elif self.primary =='S1': 
+        elif self.primary =='S1':
             primary_products_sorted =sort_S1(primary_products, footprint,sorting_params= self.primary_S1_params, sorting_params_ascending=self.primary_S1_params_ascending)
-        
-        
+
+
         return primary_products_sorted
-    
+
     def select_primary(self, primary_products_sorted, footprint, print_fig):
 #         print("Selecting primary product")
-        if self.primary =='S2': 
+        if self.primary =='S2':
             primary_final_df, ROI_table_primary = select_S2(
             primary_products_sorted, footprint, self.primary_S2_params, self.primary_S2_params_ascending
             )
-        elif self.primary =='S1': 
+        elif self.primary =='S1':
             primary_final_df, ROI_table_primary = select_S1(
             primary_products_sorted, footprint, self.secondary_S1_params, self.primary_S1_params_ascending
             )
         return primary_final_df, ROI_table_primary
-        
+
     def find_secondary(self, primary_prod, roi_primary,  plot_tiles):
 #         print("Finding secondary product")
         centre_date = primary_prod["beginposition"]
         start_date = centre_date - timedelta(days=self.secondary_time_delta)
         end_date = centre_date + timedelta(days=self.secondary_time_delta)
-        if self.primary =='S2': 
+        if self.primary =='S2':
             if self.S1_SLC:
                 secondary_products_df=find_S1_SLC(roi_primary, start_date, end_date, self.api, plot_tiles=False)
             else:
                 secondary_products_df=find_S1(roi_primary, start_date, end_date, self.api, plot_tiles=False)
-        elif self.primary =='S1': 
+        elif self.primary =='S1':
             secondary_products_df=find_S2(roi_primary, start_date, end_date, self.cloudcover, self.cloud_mask_filtering, self.api)
         return secondary_products_df
-    
+
     def sort_secondary(self, secondary_products, primary_product, footprint):
         ## Find out the time difference in hours between primary and secondary
         secondary_products["abs_time_delta_from_primary_hrs"]=  abs((secondary_products["beginposition"] -       primary_product["beginposition"]).dt.total_seconds()/3600)
-        if self.primary =='S2': 
+        if self.primary =='S2':
             secondary_products_sorted =sort_S1(secondary_products, footprint,sorting_params= self.secondary_S1_params, sorting_params_ascending=self.secondary_S1_params_ascending)
-        elif self.primary =='S1': 
+        elif self.primary =='S1':
             secondary_products_sorted =sort_S2(secondary_products, footprint, sorting_params=self.secondary_S2_params, sorting_params_ascending=self.secondary_S2_params_ascending)
         return secondary_products_sorted
-    
+
     def select_secondary(self, secondary_products_sorted, primary_product, footprint, print_fig=False):
-          
-        if self.primary =='S2': 
+
+        if self.primary =='S2':
             secondary_final_df, ROI_table_secondary = select_S1(
             secondary_products_sorted, footprint, self.secondary_S1_params, self.secondary_S1_params_ascending)
-        elif self.primary =='S1': 
+        elif self.primary =='S1':
             secondary_final_df, ROI_table_secondary = select_S2(
-            secondary_products_sorted, footprint, self.secondary_S2_params, self.secondary_S2_params_ascending)   
-         
+            secondary_products_sorted, footprint, self.secondary_S2_params, self.secondary_S2_params_ascending)
+
         return secondary_final_df, ROI_table_secondary
 
     def find_products(self):
@@ -1213,35 +1240,35 @@ class SentinelPreprocessor:
         end_date=nearest_next_sunday(yyyymmdd_to_date(self.end))
 
         print('Initial date, Ending date:',start_date, end_date)
-        
+
         s2_products_df = gpd.GeoDataFrame()
         starts = [
             start_date + timedelta(days=duration_no * self.primary_prod_frequency)
             for duration_no in range(0, math.ceil((end_date - start_date).days / self.primary_prod_frequency))
         ]
-        
+
         for start in starts:
-            end = (start + timedelta(days=self.primary_prod_frequency-1))            
+            end = (start + timedelta(days=self.primary_prod_frequency-1))
             print('\n \n-----------------------------------------------------------------------')
             print('Duration-start, Duration-end: ', start.strftime("%Y%m%d"),'-', end.strftime("%Y%m%d"))
-            
+
             week_product_map =[]
             primary_products_df =self.find_primary(self.roi.shape,  start, end)
             if primary_products_df.empty:
-                
+
                 if (self.skip_week == False) and (self.available_area == False):
                     logging.info(f"No matching {self.primary} product found for the week {start} - {end}")
                     user_input = input(f"No matching {self.primary} product found for the week {start} - {end}  Press y to skip this week, n to abort the processing, y_all to skip all weeks not matching required specification: ")
                     if user_input == 'y':
                         continue
                     elif user_input == 'n':
-                        raise Exception("Processing aborted")  
+                        raise Exception("Processing aborted")
                     elif user_input == 'y_all':
                         self.skip_week = True
                         continue
                     else:
                         raise Exception("Invalid input, Processing aborted")
-                        
+
                 else:
                     continue
 
@@ -1250,7 +1277,7 @@ class SentinelPreprocessor:
             primary_final_df, ROI_table_primary = self.select_primary(
             primary_products_sorted, self.roi.shape, print_fig=False
             )
-            
+
             Area_covered=np.sum(primary_final_df["Percent_area_covered"])
             if  (Area_covered<99):
                 if (self.skip_week == False):
@@ -1259,7 +1286,7 @@ class SentinelPreprocessor:
                         user_input = input(f"Press 'y' to skip this week, 'y_all' to skip all weeks not matching required specifications, 'a' to process the available part of ROI, 'n' to abort the processing: ")
                         if user_input == 'y':
                             continue
-                        elif user_input == 'n':                       
+                        elif user_input == 'n':
                             logging.debug(f"Complete ROI is not covered by the primary {self.primary} product, Area covered by {self.primary} products is {Area_covered}% Processing aborted")
                             raise Exception("Processing aborted")
                         elif user_input == 'y_all':
@@ -1267,17 +1294,17 @@ class SentinelPreprocessor:
                             continue
                         elif user_input == 'a':
                             self.available_area = True
-                        else:                                   
-                            raise Exception("Invalid input, Processing aborted") 
+                        else:
+                            raise Exception("Invalid input, Processing aborted")
                 else:
                     continue
-                
-            primary_fig_title = self.primary+' tiles and ROI from '+start.strftime("%Y%m%d")+' to '+end.strftime("%Y%m%d")           
+
+            primary_fig_title = self.primary+' tiles and ROI from '+start.strftime("%Y%m%d")+' to '+end.strftime("%Y%m%d")
 #             plot_Stiles_plus_ROI(self.roi.shape, primary_final_df , s_tiles_color="green", grid=False, title =s2_fig_title)
-            
+
             for i in range(0, primary_final_df.shape[0]):
                 primary_prod = primary_final_df.iloc[i]
-                
+
                 if not self.skip_secondary:
                     try:
                         secondary_products_df = self.find_secondary(primary_prod, ROI_table_primary[i],plot_tiles=False)
@@ -1289,35 +1316,35 @@ class SentinelPreprocessor:
 #                 secondary_fig_title = self.secondary+'tiles and ROI from '+start+' to '+end
 #                 plot_S1S2tiles_plus_ROI( ROI_table_primary[i], secondary_final_df ,pd.DataFrame([primary_prod]), grid=False, title=s1_fig_title)
                     if secondary_products_df.empty:
-                
+
                         if (self.skip_week == False) and (self.available_area == False):
                             logging.info(f"No matching {self.secondary} product found for corresonding {self.primary} for the week {start} - {end}")
                             user_input = input(f"No matching {self.secondary} product found for corresonding {self.primary} for the week {start} - {end} , Press y to skip this week, n to abort the processing, y_all to skip all weeks not matching required specifications: ")
                             if user_input == 'y':
                                 continue
                             elif user_input == 'n':
-                                raise Exception("Processing aborted")  
+                                raise Exception("Processing aborted")
                             elif user_input == 'y_all':
                                 self.skip = True
                                 continue
                             else:
-                                raise Exception("Invalid input, Processing aborted")                        
+                                raise Exception("Invalid input, Processing aborted")
                         else:
-                            continue               
+                            continue
                     else:
                         secondary_products_sorted = self.sort_secondary(secondary_products_df, primary_prod, ROI_table_primary[i])
                         secondary_final_df,ROI_table_secondary =self.select_secondary(secondary_products_sorted, primary_prod, ROI_table_primary[i], print_fig=False)
-                        
+
                         row_no =0
                         for _, secondary_row in secondary_final_df.iterrows():
                         # print('\t', row['summary'])
                             s1_prod_old = None
-                            if self.primary == 'S2': 
+                            if self.primary == 'S2':
                                 s2_prod = primary_prod
                                 s1_prod = secondary_row
                                 if self.multitemporal:
                                     s1_prod_old_df = find_S1_IW_old(secondary_row,  self.api)
-                                
+
                                     if s1_prod_old_df.empty:
                                         print('S1 old not found, this ROI is skipped')
                                         continue
@@ -1330,21 +1357,21 @@ class SentinelPreprocessor:
                                         for _, s1_old_product in s1_prod_old_df.iterrows():
                                             if s1_old_product.beginposition == ref_sensing_date:
                                                 same_sensed_image = True
-                                            else: 
+                                            else:
                                                 same_sensed_image = False
                                                 break
                                         if same_sensed_image:
                                              s1_prod_old_df = s1_prod_old_df.sort_values(by=["ingestiondate"], ascending=False)
-                                             s1_prod_old = s1_prod_old_df.iloc[0]                                        
-                                        else: 
+                                             s1_prod_old = s1_prod_old_df.iloc[0]
+                                        else:
                                             print(s1_prod_old_df)
-                                            raise Exception(" More than 1 S1 old products found, Processing aborted")                                   
+                                            raise Exception(" More than 1 S1 old products found, Processing aborted")
                             else:
                                 s1_prod = primary_prod
                                 s2_prod = secondary_row
                             week_product_map.append((start,s1_prod, s2_prod, s1_prod_old, ROI_table_secondary[row_no], ROI_table_secondary[row_no].area/self.roi.shape.area*100))
                             row_no = row_no + 1
-                    
+
                         week_product_map_df = pd.DataFrame(week_product_map, columns= ['week_start','S1', 'S2', 'S1_old', 'ROI', 'ROI_area'])
                 else:
                     if self.primary == 'S2':
@@ -1360,10 +1387,10 @@ class SentinelPreprocessor:
             week_product_map_df = week_product_map_df.sort_values(by=["ROI_area"], ascending=(False))
             week_product_map_df['ROI_no'] = [n for n in range(1,len(week_product_map_df)+1)]
                     #             week_product_map_df = week_product_map_df.drop(columns=['ROI_area']) ## Area is no longer needed. It was used for sorting
-                
+
             week_product_map_list=week_product_map_df.values.tolist()
             self.product_map.extend(week_product_map_list)
-        
+
 #         self.available_s2 = total_s2_available
 #         self.available_s1 = total_s1_available
 #         self.n_available = (len(total_s2_available), len(total_s1_available))
@@ -1384,29 +1411,29 @@ class SentinelPreprocessor:
         print('\n \n-----------------------------------------------------------------------')
         print('Summary')
         print('-----------------------------------------------------------------------')
-        
+
         if self.primary=='S2':
             print('\nSentinel-2 is the primary product\n')
         elif self.primary=='S1':
             print('\nSentinel-1 is the primary product\n')
-            
+
         current_start = self.product_map[0][0]
         print('-------------------------')
         print('Duration start date', current_start)
-        
+
         for (start,s1_df, s2_df, s1_old_df, roi, roi_area, roi_no) in self.product_map:
             if start != current_start:
                 current_start = start
                 print('-------------------------')
                 print('Duration start date', start)
-                
+
             print('ROI no', roi_no, 'Percentage Area:', roi_area, 'ROI:', roi)
 #             print(s1_df.keys())
-            if s1_df is not None:  
+            if s1_df is not None:
                 print("S1 -", s1_df.title, s1_df.slicenumber,s1_df.orbitnumber, s1_df.uuid,s1_df.beginposition,s1_df.Percent_area_covered)
             if s2_df is not None:
                 print("S2 -", s2_df.title, s2_df.uuid, s2_df.beginposition,s2_df.Percent_area_covered)
-            if s1_old_df is not None: 
+            if s1_old_df is not None:
                 print("S1 old -", s1_old_df.title, s1_df.uuid, s1_old_df.beginposition)
         query_time_taken = datetime.now() - query_start_time
         print("Time taken for displaying the products is ",query_time_taken)
@@ -1424,10 +1451,10 @@ class SentinelPreprocessor:
             else:
                 print('S1 File does not exist')
                 ## Download the file
-                
-        
+
+
         s2_zip = str(Path(SENTINEL_ROOT) / f"{s2_title}.zip")
-        
+
         if Path(s2_zip).exists():
             print('S2 Zip file exists')
         else:
@@ -1442,7 +1469,7 @@ class SentinelPreprocessor:
 
         filename_s1_collocated.parent.mkdir(exist_ok=True, parents=True)
         filename_s2_collocated.parent.mkdir(exist_ok=True, parents=True)
-        
+
         ## Combining the bands_S1 and bands_S2 in a string to pass it to the gpt file
         separator = ','
         bands_S1_string=separator.join(self.bands_S1)
@@ -1460,12 +1487,12 @@ class SentinelPreprocessor:
         print("Collocating might take a long time (...hours) depending upon the size of the area collocated")
         # gpt complains if LD_LIBRARY_PATH is not set
         # for some reason, this works on jupyter, but not from terminal
-        
+
         if 'LD_LIBRARY_PATH' not in os.environ:
             os.environ['LD_LIBRARY_PATH'] = '.'
-        
+
         if not self.full_collocation:
-            
+
             ROI_subset_string=str(ROI_subset).replace('POLYGON ','POLYGON')
             proc_output = subprocess.run(
                 [
@@ -1483,7 +1510,7 @@ class SentinelPreprocessor:
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             # stderr=subprocess.DEVNULL # hide gpt's info and warning messages
             )
-                    
+
         else:
             proc_output = subprocess.run(
                     [
@@ -1500,21 +1527,21 @@ class SentinelPreprocessor:
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             # stderr=subprocess.DEVNULL # hide gpt's info and warning messages
                 )
-      
+
         err = proc_output.returncode
-        
+
         if err:
-            
+
             # print(proc_output.stdout.decode())
-            print(proc_output)  
+            print(proc_output)
             if "out of bounds" in proc_output.stdout.decode():
                 logging.debug(f"gpt out of bounds error: {s1_id} and {s2_id}")
-                        
+
                 raise CoordinateOutOfBoundsError(err)
             raise Exception("Collocating: gpt return code %s " % (err))
 
             # Add this product to the global list of used-products
-        if (self.full_collocation): 
+        if (self.full_collocation):
             mark_product_as_used(s1_uuid=s1_id, s1_date=s1_date, s2_uuid=s2_id, s2_date=s2_date, collocated_folder = dir_out_for_roi)
         return filename_s1_collocated, filename_s2_collocated
 
@@ -1532,10 +1559,10 @@ class SentinelPreprocessor:
             else:
                 print('S1 File does not exist')
                 ## Download the file
-                
-        
+
+
         s2_zip = str(Path(SENTINEL_ROOT) / f"{s2_title}.zip")
-        
+
         if Path(s2_zip).exists():
             print('S2 Zip file exists')
         else:
@@ -1553,14 +1580,14 @@ class SentinelPreprocessor:
             else:
                 print('S1 old File does not exist')
                 ## Download the file
-                
+
         imagename = f"S1_{s1_id}_S2_{s2_id}.tif"
         filename_s1_collocated = dir_out_for_roi / "S1" / "Collocated" / imagename
         filename_s2_collocated = dir_out_for_roi / "S2" / "Collocated" / imagename
 
         filename_s1_collocated.parent.mkdir(exist_ok=True, parents=True)
         filename_s2_collocated.parent.mkdir(exist_ok=True, parents=True)
-        
+
         ## Combining the bands_S1 and bands_S2 in a string to pass it to the gpt file
         separator = ','
         bands_S1_string=separator.join(self.bands_S1)
@@ -1570,7 +1597,7 @@ class SentinelPreprocessor:
         bands_S1_cur_string = bands_S1_cur_string+','
         bands_S1_old_string = bands_S1_string.replace('_S','_S1')
         bands_S1_combined= bands_S1_cur_string+bands_S1_old_string
-        
+
         logging.debug(f"Colloc fn s1 {filename_s1_collocated} exists? {filename_s1_collocated.exists()}")
         logging.debug(f"Colloc fn s2 {filename_s2_collocated} exists? {filename_s2_collocated.exists()}")
 
@@ -1583,12 +1610,12 @@ class SentinelPreprocessor:
         print("Collocating might take a long time (...hours) depending upon the size of the area collocated")
         # gpt complains if LD_LIBRARY_PATH is not set
         # for some reason, this works on jupyter, but not from terminal
-        
+
         if 'LD_LIBRARY_PATH' not in os.environ:
             os.environ['LD_LIBRARY_PATH'] = '.'
-        
+
         if not self.full_collocation:
-            
+
             ROI_subset_string=str(ROI_subset).replace('POLYGON ','POLYGON')
             proc_output = subprocess.run(
                 [
@@ -1607,26 +1634,26 @@ class SentinelPreprocessor:
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             # stderr=subprocess.DEVNULL # hide gpt's info and warning messages
             )
-                    
+
         else:
             raise Exception("Full collocation gpt graph not yet implemented")
-      
+
         err = proc_output.returncode
-        
+
         if err:
-            
+
             # print(proc_output.stdout.decode())
-            print(proc_output)  
+            print(proc_output)
             if "out of bounds" in proc_output.stdout.decode():
                 logging.debug(f"gpt out of bounds error: {s1_id} and {s2_id}")
-                        
+
                 raise CoordinateOutOfBoundsError(err)
             raise Exception("Collocating: gpt return code %s " % (err))
 
             # Add this product to the global list of used-products
-        if (self.full_collocation): 
+        if (self.full_collocation):
             mark_product_as_used(s1_uuid=s1_id, s1_date=s1_date, s2_uuid=s2_id, s2_date=s2_date, collocated_folder = dir_out_for_roi)
-        return filename_s1_collocated, filename_s2_collocated    
+        return filename_s1_collocated, filename_s2_collocated
 
     def collocate_SLC_multitemporal(self, dir_out_for_roi,ROI_subset, s1_title, s1_id, s1_date, s2_title, s2_id, s2_date, s1_old_title, s1_old_id, s1_old_date):
         """Collocate Sen1 and Sen2 products."""
@@ -1642,10 +1669,10 @@ class SentinelPreprocessor:
             else:
                 print('S1 File does not exist')
                 ## Download the file
-                
-        
+
+
         s2_zip = str(Path(SENTINEL_ROOT) / f"{s2_title}.zip")
-        
+
         if Path(s2_zip).exists():
             print('S2 Zip file exists')
         else:
@@ -1663,31 +1690,31 @@ class SentinelPreprocessor:
             else:
                 print('S1 old File does not exist')
                 ## Download the file
-                
+
         imagename = f"S1_{s1_id}_S2_{s2_id}.tif"
         filename_s1_collocated = dir_out_for_roi / "S1" / "Collocated" / imagename
         filename_s2_collocated = dir_out_for_roi / "S2" / "Collocated" / imagename
 
         filename_s1_collocated.parent.mkdir(exist_ok=True, parents=True)
         filename_s2_collocated.parent.mkdir(exist_ok=True, parents=True)
-        
+
         s1_date_string = datetime.strptime(s1_date,"%Y%m%d").strftime("%d%b%Y")
         s1_old_date_string = datetime.strptime(s1_old_date,"%Y%m%d").strftime("%d%b%Y")
-        
+
         ## Combining the bands_S1 and bands_S2 in a string to pass it to the gpt file
         separator = ','
         bands_S1_string=separator.join(self.bands_S1)
         bands_S2_string=separator.join(self.bands_S2)
 
         bands_S1_extended ='coh_VH_'+s1_date_string+'_'+s1_old_date_string+'_S,coh_VV_'+s1_date_string+'_'+s1_old_date_string+'_S'
-        
+
         bands_S1_cur_string = bands_S1_string.replace('Sigma0_VH','Sigma0_VH_slv1_'+s1_date_string)
         bands_S1_cur_string = bands_S1_cur_string.replace('Sigma0_VV','Sigma0_VV_slv2_'+s1_date_string)
         bands_S1_old_string = bands_S1_string.replace('Sigma0_VH','Sigma0_VH_slv3_'+s1_old_date_string)
         bands_S1_old_string = bands_S1_old_string.replace('Sigma0_VV','Sigma0_VV_slv4_'+s1_old_date_string)
-        
+
         bands_S1_combined= bands_S1_cur_string+','+bands_S1_old_string+','+bands_S1_extended
-        
+
         logging.debug(f"Colloc fn s1 {filename_s1_collocated} exists? {filename_s1_collocated.exists()}")
         logging.debug(f"Colloc fn s2 {filename_s2_collocated} exists? {filename_s2_collocated.exists()}")
 
@@ -1700,12 +1727,12 @@ class SentinelPreprocessor:
         print("Collocating might take a long time (...hours) depending upon the size of the area collocated")
         # gpt complains if LD_LIBRARY_PATH is not set
         # for some reason, this works on jupyter, but not from terminal
-        
+
         if 'LD_LIBRARY_PATH' not in os.environ:
             os.environ['LD_LIBRARY_PATH'] = '.'
-        
+
         if not self.full_collocation:
-            
+
             ROI_subset_string=str(ROI_subset).replace('POLYGON ','POLYGON')
             proc_output = subprocess.run(
                 [
@@ -1726,25 +1753,25 @@ class SentinelPreprocessor:
             )
         else:
             raise Exception("Full collocation gpt graph not yet implemented")
-            
+
         err = proc_output.returncode
-        
+
         if err:
-            
+
             # print(proc_output.stdout.decode())
-            print(proc_output)  
+            print(proc_output)
             if "out of bounds" in proc_output.stdout.decode():
                 logging.debug(f"gpt out of bounds error: {s1_id} and {s2_id}")
-                        
+
                 raise CoordinateOutOfBoundsError(err)
             raise Exception("Collocating: gpt return code %s " % (err))
 
             # Add this product to the global list of used-products
-        if (self.full_collocation): 
+        if (self.full_collocation):
             mark_product_as_used(s1_uuid=s1_id, s1_date=s1_date, s2_uuid=s2_id, s2_date=s2_date, collocated_folder = dir_out_for_roi)
-        return filename_s1_collocated, filename_s2_collocated    
-    
-    
+        return filename_s1_collocated, filename_s2_collocated
+
+
     def snap_s1(self, dir_out_for_roi,ROI_subset, s1_title, s1_id, s1_date):
         """Collocate Sen1 and Sen2 products."""
         s1_zip = str(Path(SENTINEL_ROOT) / f"{s1_title}.zip")
@@ -1760,7 +1787,7 @@ class SentinelPreprocessor:
         imagename = f"S1_{s1_id}.tif"
         filename_s1_collocated = dir_out_for_roi / "S1" / "Collocated" / imagename
         filename_s1_collocated.parent.mkdir(exist_ok=True, parents=True)
-        
+
         ## Combining the bands_S1 and bands_S2 in a string to pass it to the gpt file
 
         if 'collocationFlags' in self.bands_S1:
@@ -1779,12 +1806,12 @@ class SentinelPreprocessor:
         print("Collocating might take a long time (...hours) depending upon the size of the area collocated")
         # gpt complains if LD_LIBRARY_PATH is not set
         # for some reason, this works on jupyter, but not from terminal
-        
+
         if 'LD_LIBRARY_PATH' not in os.environ:
             os.environ['LD_LIBRARY_PATH'] = '.'
-        
+
         if not self.full_collocation:
-            
+
             ROI_subset_string=str(ROI_subset).replace('POLYGON ','POLYGON')
 
             proc_output = subprocess.run(
@@ -1799,7 +1826,7 @@ class SentinelPreprocessor:
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             # stderr=subprocess.DEVNULL # hide gpt's info and warning messages
             )
-                    
+
         else:
             proc_output = subprocess.run(
                     [
@@ -1812,28 +1839,28 @@ class SentinelPreprocessor:
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             # stderr=subprocess.DEVNULL # hide gpt's info and warning messages
                 )
-      
+
         err = proc_output.returncode
-        
+
         if err:
-            
+
             # print(proc_output.stdout.decode())
-            print(proc_output)  
+            print(proc_output)
             if "out of bounds" in proc_output.stdout.decode():
                 logging.debug(f"gpt out of bounds error: {s1_id}")
-                        
+
                 raise CoordinateOutOfBoundsError(err)
             raise Exception("Collocating: gpt return code %s " % (err))
         if self.full_collocation:
             mark_product_as_used(s1_uuid=s1_id, s1_date=s1_date, s2_uuid='None', s2_date='None', collocated_folder = dir_out_for_roi)
 
-        return filename_s1_collocated   
-    
-    
+        return filename_s1_collocated
+
+
     def snap_s2(self, dir_out_for_roi,ROI_subset, s2_title, s2_id, s2_date):
         """Collocate Sen1 and Sen2 products."""
         s2_zip = str(Path(SENTINEL_ROOT) / f"{s2_title}.zip")
-        
+
         if Path(s2_zip).exists():
             print('S2 Zip file exists')
         else:
@@ -1845,7 +1872,7 @@ class SentinelPreprocessor:
         imagename = f"S2_{s2_id}.tif"
         filename_s2_collocated = dir_out_for_roi / "S2" / "Collocated" / imagename
         filename_s2_collocated.parent.mkdir(exist_ok=True, parents=True)
-        
+
         ## Combining the bands_S2 in a string to pass it to the gpt file
         separator = ','
         bands_S1_string=separator.join(self.bands_S1)
@@ -1862,12 +1889,12 @@ class SentinelPreprocessor:
         print("Collocating might take a long time (...hours) depending upon the size of the area collocated")
         # gpt complains if LD_LIBRARY_PATH is not set
         # for some reason, this works on jupyter, but not from terminal
-        
+
         if 'LD_LIBRARY_PATH' not in os.environ:
             os.environ['LD_LIBRARY_PATH'] = '.'
-        
+
         if not self.full_collocation:
-            
+
             ROI_subset_string=str(ROI_subset).replace('POLYGON ','POLYGON')
 
             proc_output = subprocess.run(
@@ -1882,7 +1909,7 @@ class SentinelPreprocessor:
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             # stderr=subprocess.DEVNULL # hide gpt's info and warning messages
             )
-                    
+
         else:
             proc_output = subprocess.run(
                     [
@@ -1895,25 +1922,25 @@ class SentinelPreprocessor:
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             # stderr=subprocess.DEVNULL # hide gpt's info and warning messages
                 )
-      
+
         err = proc_output.returncode
-        
-        if err:            
+
+        if err:
             # print(proc_output.stdout.decode())
-            print(proc_output)  
+            print(proc_output)
             if "out of bounds" in proc_output.stdout.decode():
                 logging.debug(f"gpt out of bounds error: {s2_id}")
-                        
+
                 raise CoordinateOutOfBoundsError(err)
             raise Exception("Collocating: gpt return code %s " % (err))
         # Add this product to the global list of used-products
         if self.full_collocation:
-            mark_product_as_used(s1_uuid='None', s1_date='None', s2_uuid=s2_id, s2_date=s2_date, collocated_folder = dir_out_for_roi) 
+            mark_product_as_used(s1_uuid='None', s1_date='None', s2_uuid=s2_id, s2_date=s2_date, collocated_folder = dir_out_for_roi)
         return filename_s2_collocated
-    
+
     def crop(self, dir_out_for_roi, s1_or_s2, product_id, path_collocated, ROI_subset, roi_no):
         s1_or_s2 = s1_or_s2.upper()
-        assert s1_or_s2 in ["S1", "S2"], "s1_or_s2 must be 'S1' or 'S2'"        
+        assert s1_or_s2 in ["S1", "S2"], "s1_or_s2 must be 'S1' or 'S2'"
         roi_path = str(dir_out_for_roi / f"ROI{roi_no}.geojson")
         raster = rio.open(path_collocated)
 
@@ -1925,7 +1952,7 @@ class SentinelPreprocessor:
         utm_ROI = transform(project, ROI_subset)
 #         utm_ROI = utm_ROI.intersection(
 #             utm_ROI
-#         )  ##Just a way around make multipolygon to polygon      
+#         )  ##Just a way around make multipolygon to polygon
         if not hasattr(utm_ROI, 'exterior'):
             logging.warning("utm_ROI doesn't have an 'exterior'")
             logging.warning(f"Type of utm_ROI: {str(type(utm_ROI))}")
@@ -1940,7 +1967,7 @@ class SentinelPreprocessor:
 #             else:
 #                 raise E
             ### For multi polygons exterior.coords does not exist, so converting it to polygon
-            utm_ROI = multipolygon_to_polygon(utm_ROI)          
+            utm_ROI = multipolygon_to_polygon(utm_ROI)
             if utm_ROI.is_valid == False:
                 utm_ROI = utm_ROI.buffer(0)
             utm_ROI_m = MultiPolygon([utm_ROI])
@@ -1960,14 +1987,14 @@ class SentinelPreprocessor:
         clipped_file_path = dir_out_clipped / filename
         if clipped_file_path.exists():
             clipped_file_path.unlink()  # Delete a clipped file if it exists
-        
-        ### S1 collocated has datatype of float32 while S2 collocated has datatype of Uint16, but if we dont pass output type to gdal warp, it saves both S1 and S2 clipped file in float32 and so for S2, clipped file has much larger size than collocated file 
+
+        ### S1 collocated has datatype of float32 while S2 collocated has datatype of Uint16, but if we dont pass output type to gdal warp, it saves both S1 and S2 clipped file in float32 and so for S2, clipped file has much larger size than collocated file
         ### To check later
 #         if s1_or_s2 == 'S1':
 #             gdal_result = gdal.Warp(str(clipped_file_path),str(path_collocated),cutlineDSName = str(roi_path), cropToCutline=True, dstNodata=999999999.0)
 #         elif s1_or_s2 == 'S2':
 #             gdal_result = gdal.Warp(str(clipped_file_path),str(path_collocated),cutlineDSName = str(roi_path), cropToCutline=True, dstNodata=999999999.0, outputType=gdal.gdalconst.GDT_UInt16)
-        gdal_result = gdal.Warp(str(clipped_file_path),str(path_collocated),cutlineDSName = str(roi_path), cropToCutline=True, dstNodata=999999999.0,  warpOptions=['CUTLINE_ALL_TOUCHED=TRUE'])       
+        gdal_result = gdal.Warp(str(clipped_file_path),str(path_collocated),cutlineDSName = str(roi_path), cropToCutline=True, dstNodata=999999999.0,  warpOptions=['CUTLINE_ALL_TOUCHED=TRUE'])
         gdal_result = None ## Important to initial gdal writing operations
 
         raster.close()
@@ -1995,7 +2022,7 @@ class SentinelPreprocessor:
         -------
         NO RETURN
         """
-        
+
         print('Making ',s1_or_s2,' patches')
         # Convert from pathlib.Path to str
         s1_or_s2 = s1_or_s2.upper()
@@ -2020,21 +2047,21 @@ class SentinelPreprocessor:
                 column_pixel_end = column_pixel_start + self.size[1] - 1
                 # Size is (height, width), as per Priti's code,
                 # so display size[1]_size[0] (`width_height`) in filename
-                
+
                 if (self.skip_secondary == True) and (self.primary =='S1'):
                     patch_filename = (
                         f"S1_{s1_id}"
                         + f"_{row_pixel_start}_{column_pixel_start}"
                         + f"_{self.size[1]}x{self.size[0]}.tif"
                     )
-                    
+
                 elif (self.skip_secondary == True) and (self.primary =='S2'):
                     patch_filename = (
                         f"S2_{s2_id}"
                         + f"_{row_pixel_start}_{column_pixel_start}"
                         + f"_{self.size[1]}x{self.size[0]}.tif"
                     )
-                    
+
                 else:
                     patch_filename = (
                         f"S1_{s1_id}"
@@ -2076,7 +2103,7 @@ class SentinelPreprocessor:
         # SENTINEL_STORAGE_PATH = os.environ['SENTINEL_STORAGE_PATH']
         parent_dir = Path(SENTINEL_STORAGE_PATH) / self.roi_name
         parent_dir.mkdir(exist_ok=True, parents=True)
-        
+
         for _,s1, s2, s1_old, ROI_subset,_, roi_no in self.product_map:
             if s1 is not None:  # Download Sentinel 1 Product
                 if not self.external_bucket:
@@ -2085,25 +2112,25 @@ class SentinelPreprocessor:
                         self.api.download(s1["uuid"], directory_path=SENTINEL_ROOT, checksum=True)
                     else:
                         download_S1_NOAA(s1)
-                        print('\nDownloading', s1["title"],'from NOAA as it is not online on copernicus')                        
+                        print('\nDownloading', s1["title"],'from NOAA as it is not online on copernicus')
                 else:
                     print('\nDownloading', s1["title"],'from NOAA')
                     download_S1_NOAA(s1)
-                    
+
             if s2 is not None:  # Download Sentinel 2 Product
                 if not self.external_bucket:
                     if self.api.get_product_odata(s2["uuid"])['Online']== True:
-                        print('\nDownloading', s2["title"],'from sentinelsat') 
+                        print('\nDownloading', s2["title"],'from sentinelsat')
                         self.api.download(s2["uuid"], directory_path=SENTINEL_ROOT, checksum=True)
                     else:
                         print('\nDownloading', s2["title"],'from Google as it is not online on copernicus')
-                        download_S2_GCS(s2)                         
+                        download_S2_GCS(s2)
 
                 else:
 #                         print('\nDownloading', s2["uuid"],'from sentinelhub')
-#                         download_S2_sentinelhub(s2) 
+#                         download_S2_sentinelhub(s2)
                    print('\nDownloading', s2["title"],'from Google')
-                   download_S2_GCS(s2) 
+                   download_S2_GCS(s2)
             if s1_old is not None:  # Download Sentinel 1 Product
                 if not self.external_bucket:
                     if self.api.get_product_odata(s1_old["uuid"])['Online']== True:
@@ -2111,13 +2138,13 @@ class SentinelPreprocessor:
                         self.api.download(s1_old["uuid"], directory_path=SENTINEL_ROOT, checksum=True)
                     else:
                         download_S1_NOAA(s1_old)
-                        print('\nDownloading', s1_old["title"],'from NOAA as it is not online on copernicus')                        
+                        print('\nDownloading', s1_old["title"],'from NOAA as it is not online on copernicus')
                 else:
                     print('\nDownloading', s1_old["title"],'from NOAA')
                     download_S1_NOAA(s1_old)
         download_time_taken = datetime.now() - download_start_time
         print("Time taken for downloading is ", download_time_taken)
-        
+
     def process(self):
         """Download and preprocess available products."""
         process_start_time = datetime.now()
@@ -2143,17 +2170,17 @@ class SentinelPreprocessor:
         # filename_geojson = self.roi["filename"]
         # if not Path(filename_geojson).parent == parent_dir:
         #     shutil.copy(filename_geojson, parent_dir)
-        
+
 
         if self.rebuild:
             logging.info("Rebuilding products")
             s1_s2_products_existing = pd.DataFrame()
         else:
-            s1_s2_products_existing = existing_processed_products()            
-        
+            s1_s2_products_existing = existing_processed_products()
+
         for start,s1,  s2, s1_old, ROI_subset,_, roi_no in self.product_map:
-            
-            if self.primary == 'S2':            
+
+            if self.primary == 'S2':
                 dir_out_for_roi = (
                     Path(SENTINEL_STORAGE_PATH)
                     / self.roi_name
@@ -2168,7 +2195,7 @@ class SentinelPreprocessor:
                     / f"ROI{roi_no}"
                     )
             print("ROI Dir", dir_out_for_roi)
-           
+
             if s1 is not None:
                 s1_id = s1["uuid"]
                 logging.info(f"- S1 {s1_id}")
@@ -2176,7 +2203,7 @@ class SentinelPreprocessor:
                 s1_title = s1["title"]
                 dir_out_S1_patches = dir_out_for_roi / "S1" / "Patches"
                 print('s1_title',s1_title)
-            
+
             if s2 is not None:
                 s2_id = s2.uuid
                 logging.info(f"Processing ROI subset {ROI_subset}, S2 {s2_id}")
@@ -2184,35 +2211,35 @@ class SentinelPreprocessor:
                 # if has_product_been_used(s2_id):
                 #     print(f"Skipping used S2 product {s2_id}")
                 #     continue
-                s2_title = s2.title                  
+                s2_title = s2.title
                 dir_out_S2_patches = dir_out_for_roi / "S2" / "Patches"
                 print('s2_title',s2_title)
-                
+
             if s1_old is not None:
                 s1_old_id = s1_old["uuid"]
                 logging.info(f"- S1 old {s1_old_id}")
                 s1_old_date = s1_old["beginposition"].strftime("%Y%m%d")
                 s1_old_title = s1_old["title"]
                 print('s1_old_title',s1_old_title)
-                
+
             products_exist = False
             if not self.rebuild:
                 path_s1_collocated, path_s2_collocated  = None, None
-                               
+
                 if (s1 is not None) and (s2 is not None):
                      ## Check whether the collocated products exist
                     if isinstance(s1_s2_products_existing, pd.DataFrame):
-                        existing_products=s1_s2_products_existing[(s1_s2_products_existing['S1-uuid']==s1_id) & (s1_s2_products_existing['S2-uuid']==s2_id)]              
+                        existing_products=s1_s2_products_existing[(s1_s2_products_existing['S1-uuid']==s1_id) & (s1_s2_products_existing['S2-uuid']==s2_id)]
                         if  len(existing_products)>0:
                             ## sort the products to use the latest collocated product
-                            existing_products= existing_products.sort_values(by=["Processed-date"], ascending=(False))    
+                            existing_products= existing_products.sort_values(by=["Processed-date"], ascending=(False))
                             selected_used_product =  existing_products.iloc[0]
                             existing_collocated_path = selected_used_product['Collocated-folder']
-                    
+
                             imagename = f"S1_{s1_id}_S2_{s2_id}.tif"
                             path_s1_collocated = Path(existing_collocated_path) / "S1" / "Collocated" / imagename
                             path_s2_collocated = Path(existing_collocated_path) / "S2" / "Collocated" / imagename
-                        
+
                             if path_s1_collocated.exists() and path_s2_collocated.exists():
                                 products_exist = True
                                 print('S1 and S2 products exist in earlier used-products, So collocation is skipped')
@@ -2224,10 +2251,10 @@ class SentinelPreprocessor:
                 elif (s1 is not None):
                     ## Check whether the processed S1 products exist
                     if isinstance(s1_s2_products_existing, pd.DataFrame):
-                        existing_products=s1_s2_products_existing[(s1_s2_products_existing['S1-uuid']==s1_id)]            
+                        existing_products=s1_s2_products_existing[(s1_s2_products_existing['S1-uuid']==s1_id)]
                         if  len(existing_products)>0:
                             ## sort the products to use the latest collocated product
-                            existing_products= existing_products.sort_values(by=["Processed-date"], ascending=(False))    
+                            existing_products= existing_products.sort_values(by=["Processed-date"], ascending=(False))
                             selected_used_product =  existing_products.iloc[0]
                             existing_collocated_path = selected_used_product['Collocated-folder']
                             if (selected_used_product['S2-date']=='None'):
@@ -2235,19 +2262,19 @@ class SentinelPreprocessor:
                             else:
                                 s2_id_prev = selected_used_product['S2-uuid']
                                 imagename = f"S1_{s1_id}_S2_{s2_id_prev}.tif"
-                            path_s1_collocated = Path(existing_collocated_path) / "S1" / "Collocated" / imagename              
+                            path_s1_collocated = Path(existing_collocated_path) / "S1" / "Collocated" / imagename
                             if path_s1_collocated.exists():
                                 products_exist = True
                                 print('S1 product exists in earlier used-products, So snap-processing is skipped')
                                 filename_s1_collocated = dir_out_for_roi / "S1" / "Collocated" / imagename
                                 filename_s1_collocated.parent.mkdir(exist_ok=True, parents=True)
-                                
+
                 elif (s2 is not None):
                     if isinstance(s1_s2_products_existing, pd.DataFrame):
-                        existing_products=s1_s2_products_existing[(s1_s2_products_existing['S2-uuid']==s2_id)]             
+                        existing_products=s1_s2_products_existing[(s1_s2_products_existing['S2-uuid']==s2_id)]
                         if  len(existing_products)>0:
                             ## sort the products to use the latest collocated product
-                            existing_products= existing_products.sort_values(by=["Processed-date"], ascending=(False))    
+                            existing_products= existing_products.sort_values(by=["Processed-date"], ascending=(False))
                             selected_used_product =  existing_products.iloc[0]
                             existing_collocated_path = selected_used_product['Collocated-folder']
                             if selected_used_product['S1-date']=='None':
@@ -2255,34 +2282,34 @@ class SentinelPreprocessor:
                             else:
                                 s1_id_prev = selected_used_product['S1-uuid']
                                 imagename = f"S1_{s1_id_prev}_S2_{s2_id}.tif"
-                            path_s2_collocated = Path(existing_collocated_path) / "S2" / "Collocated" / imagename                        
+                            path_s2_collocated = Path(existing_collocated_path) / "S2" / "Collocated" / imagename
                             if  path_s2_collocated.exists():
                                 products_exist = True
                                 print('S2 product exists in earlier used-products, So snap-processing is skipped')
                                 filename_s2_collocated = dir_out_for_roi / "S2" / "Collocated" / imagename
-                                filename_s2_collocated.parent.mkdir(exist_ok=True, parents=True)             
-                       
+                                filename_s2_collocated.parent.mkdir(exist_ok=True, parents=True)
+
             if ((self.rebuild) or ((not self.rebuild) and (not products_exist))):
                 try:
-                    if (s1 is not None) and (s2 is not None):                        
+                    if (s1 is not None) and (s2 is not None):
 
                         if self.multitemporal and not self.S1_SLC:
                             path_s1_collocated, path_s2_collocated = self.collocate_GRD_multitemporal(dir_out_for_roi,ROI_subset, s1_title, s1_id, s1_date, s2_title, s2_id, s2_date, s1_old_title, s1_old_id, s1_old_date)
-                            
+
                         elif self.multitemporal and self.S1_SLC:
                             path_s1_collocated, path_s2_collocated = self.collocate_SLC_multitemporal(dir_out_for_roi,ROI_subset, s1_title, s1_id, s1_date, s2_title, s2_id, s2_date, s1_old_title, s1_old_id, s1_old_date)
                         else:
                             path_s1_collocated, path_s2_collocated = self.collocate(
-                            dir_out_for_roi, ROI_subset, s1_title, s1_id, s1_date, s2_title, s2_id, s2_date)                             
-           
+                            dir_out_for_roi, ROI_subset, s1_title, s1_id, s1_date, s2_title, s2_id, s2_date)
+
                     elif (s1 is not None):
                         path_s1_collocated= self.snap_s1(
-                            dir_out_for_roi, ROI_subset, s1_title, s1_id, s1_date)            
-                    
+                            dir_out_for_roi, ROI_subset, s1_title, s1_id, s1_date)
+
                     elif (s2 is not None):
                         path_s2_collocated = self.snap_s2(
-                            dir_out_for_roi, ROI_subset, s2_title, s2_id, s2_date)            
-                                               
+                            dir_out_for_roi, ROI_subset, s2_title, s2_id, s2_date)
+
                 except CoordinateOutOfBoundsError as E:
                         # log known bug
                         logging.error(E)
@@ -2291,12 +2318,12 @@ class SentinelPreprocessor:
                         # log unknown bug
                         logging.error(E)
                         raise E
-            # Crop sentinel-1 products           
+            # Crop sentinel-1 products
             if (s1 is not None):
                 if not path_s1_collocated:
                     logging.error(f"No S1 collocation file for {s1_id}, so either no products, or issue with S1 products")
                     continue
-                 
+
                 s1_clip_path = self.crop(
                     dir_out_for_roi,
                     "S1",
@@ -2312,7 +2339,7 @@ class SentinelPreprocessor:
                 except rio.errors.RasterioIOError:
                     pass
 
-            # Crop sentinel-2 products            
+            # Crop sentinel-2 products
             if (s2 is not None):
                 if not path_s2_collocated:
                     logging.error(f"No S2 collocation file for {s2_id}, so either no products, or issue with S2 products")
@@ -2332,7 +2359,7 @@ class SentinelPreprocessor:
                     self.make_patches(dir_out_S2_patches, s2_clip_path, "S2", s1_id, s2_id)
                 except rio.errors.RasterioIOError:
                     pass
-                       
+
         process_time_taken = datetime.now() - process_start_time
         print('Time taken for processing', process_time_taken)
         logging.info("Preprocessing finished")
