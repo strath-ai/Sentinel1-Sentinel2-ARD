@@ -13,6 +13,7 @@ from shapely.geometry import Polygon, MultiPolygon, shape
 from shapely.ops import transform
 from shapely.wkt import dumps as wktdump
 from shapely.wkt import loads as wktload
+import numpy as np
 
 
 class ROI:
