@@ -102,13 +102,15 @@ def export_to_file(roi, filename, crs):
         utm_ROI_m = MultiPolygon([utm_ROI])
     except Exception as E:
         ### For multi polygons exterior.coords does not exist
+
         area_list = [x.area for x in utm_ROI]
         area_array = np.array(area_list)
         max_area_polygon_no = np.argmax(area_array)
         utm_ROI = utm_ROI[max_area_polygon_no]
         if utm_ROI.is_valid == False:
             utm_ROI = utm_ROI.buffer(0)
-        utm_ROI_m = utm_ROI
+        utm_ROI_m = MultiPolygon([utm_ROI])
+
     ROI_gpd = gpd.GeoDataFrame(utm_ROI_m, crs=str(crs))
     ROI_gpd = ROI_gpd.rename(columns={0: "geometry"})
     # explicitly set it as geometry for the GeoDataFrame

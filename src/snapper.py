@@ -107,7 +107,11 @@ def s2_with_previous_s1(product_tuple, config, mount=None, rebuild=False, **kwar
     # Instead, check if there is a row in the 'collocations' table, and then add these collocation files
     # to the table before returning
     if existing_s1 and existing_s2 and not rebuild:
-        print(f"""CACHED COLLOCATION: {s1["uuid"]} and {s2["uuid"]}""")
+        print(f"""CACHED COLLOCATION (ROI{ROI_no}): {s1["uuid"]} and {s2["uuid"]}""")
+        crs = rasterio.open(filename_s1_collocated).crs
+        roiutil.export_to_file(ROI_subset, dir_out_for_roi /
+                           f"ROI{ROI_no}.geojson", crs)
+
         return [("S1", filename_s1_collocated), ("S2", filename_s2_collocated)]
 
     # gpt complains if LD_LIBRARY_PATH is not set
@@ -235,6 +239,10 @@ def s2_with_previous_s1__subset(product_tuple, config, mount=None, rebuild=False
     # to the table before returning
     if existing_s1 and existing_s2 and not rebuild:
         print(f"""CACHED COLLOCATION: {s1["uuid"]} and {s2["uuid"]}""")
+        crs = rasterio.open(filename_s1_collocated).crs
+        roiutil.export_to_file(ROI_subset, dir_out_for_roi /
+                           f"ROI{ROI_no}.geojson", crs)
+
         return [("S1", filename_s1_collocated), ("S2", filename_s2_collocated)]
 
     # gpt complains if LD_LIBRARY_PATH is not set
@@ -252,7 +260,7 @@ def s2_with_previous_s1__subset(product_tuple, config, mount=None, rebuild=False
     ROI_subset_string = str(ROI_subset).replace("POLYGON ", "POLYGON")
     if mount:
         gpt_file = str(Path(mount) / gpt_file)
-    
+
     if s1_zip.exists():
         s1_exists = s1_zip
     elif s1_bare.exists():

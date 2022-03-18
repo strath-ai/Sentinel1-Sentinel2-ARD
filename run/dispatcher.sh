@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 command=$1; shift
 
-echo $@
 case $command in
     list|l) 
         USER=metaflow python /src/list_flow.py $@

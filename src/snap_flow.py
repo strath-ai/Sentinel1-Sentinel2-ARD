@@ -151,13 +151,23 @@ class SnapProcess(FlowSpec):
             db = CacheDB(self.cfg, self.cache_db_config)
             already_downloaded_titles = db.get_results(
                 "zip").result_location.apply(lambda x: Path(x).stem).tolist()
-        to_download = [p for p in self.products if p.title not in already_downloaded_titles]
-        products_already_downloaded = [p for p in self.products if p.title in already_downloaded_titles]
-        for product in products_already_downloaded:
-            self.already_downloaded_uuid.append(product.uuid)
-        print(f"{len(products_already_downloaded)} already downloaded")
-        print(f"{len(to_download)} to download")
-        for i, product in enumerate(to_download):
+        else:
+            files_SAFE = [p.stem for p in Path(self.dir_out).glob('*.SAFE')]
+            files_ZIP = [p.stem for p in Path(self.dir_out).glob('*.zip')]
+            already_downloaded_titles = [*files_SAFE, *files_ZIP]
+
+        to_download = []
+        to_download_uuids = set()
+        # products_already_downloaded = set()
+        for p in self.products:
+            if p.title in already_downloaded_titles:
+                # products_already_downloaded.add(p)
+                self.already_downloaded_uuid.append(p.uuid)
+            else:
+                if p.uuid not in to_download_uuids:
+                    to_download.append(p)
+        print(f"{len(to_download)} to potentially download")
+        for i, product in enumerate(list(to_download)):
             print(f"DL {i+1}/{len(to_download)}: {product.uuid}", end="")
             metadata = api.get_product_odata(product.uuid)
             s1_or_s2 = metadata["title"][:2].lower()
